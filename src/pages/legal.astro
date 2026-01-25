@@ -1,0 +1,111 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Legal Notice - Pascal Krason" description="Legal notice and legal information">
+  <article class="max-w-4xl mx-auto px-6 py-20 pt-32">
+    <a 
+      href="/" 
+      class="inline-flex items-center gap-2 text-stone-500 hover:text-orange-600 mb-8 transition-colors"
+    >
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+      </svg>
+      Back to Home
+    </a>
+    
+    <header class="mb-8">
+      <h1 class="text-4xl md:text-5xl font-bold text-stone-800 mb-4">
+        Legal Notice
+      </h1>
+    </header>
+    
+    <div class="prose prose-lg max-w-none">
+      <section class="mb-8">
+        <h2 class="text-2xl font-semibold text-stone-800 mb-4">Information according to § 5 TMG</h2>
+        <p class="text-stone-700 mb-2">
+          <strong>Pascal Krason</strong>
+        </p>
+        <p class="text-stone-700 mb-2">
+          Schubertstr. 24<br />
+          58762 Altena<br />
+          Germany
+        </p>
+      </section>
+
+      <section class="mb-8">
+        <h2 class="text-2xl font-semibold text-stone-800 mb-4">Responsible for content according to § 55 Abs. 2 RStV</h2>
+        <p class="text-stone-700 mb-2">
+          Pascal Krason<br />
+          Schubertstr. 24<br />
+          58762 Altena<br />
+          Germany
+        </p>
+      </section>
+
+      <section class="mb-8">
+        <h2 class="text-2xl font-semibold text-stone-800 mb-4">Liability for Content</h2>
+        <p class="text-stone-700 mb-4">
+          As a service provider, I am responsible for my own content on these pages according to § 7 Abs. 1 TMG under general law. However, according to §§ 8 to 10 TMG, as a service provider, I am not obligated to monitor transmitted or stored third-party information or to investigate circumstances that indicate illegal activity.
+        </p>
+        <p class="text-stone-700 mb-4">
+          Obligations to remove or block the use of information under general law remain unaffected. However, liability in this regard is only possible from the point in time at which a concrete infringement of the law becomes known. Upon becoming aware of such violations, I will remove this content immediately.
+        </p>
+      </section>
+
+      <section class="mb-8">
+        <h2 class="text-2xl font-semibold text-stone-800 mb-4">Liability for Links</h2>
+        <p class="text-stone-700 mb-4">
+          My offer contains links to external websites of third parties, on whose contents I have no influence. Therefore, I cannot assume any liability for these external contents. The respective provider or operator of the pages is always responsible for the contents of the linked pages. The linked pages were checked for possible legal violations at the time of linking. Illegal contents were not recognizable at the time of linking.
+        </p>
+        <p class="text-stone-700 mb-4">
+          However, a permanent content control of the linked pages is not reasonable without concrete evidence of a violation of the law. Upon becoming aware of violations, I will remove such links immediately.
+        </p>
+      </section>
+
+      <section class="mb-8">
+        <h2 class="text-2xl font-semibold text-stone-800 mb-4">Copyright</h2>
+        <p class="text-stone-700 mb-4">
+          The content and works created by the site operators on these pages are subject to German copyright law. The duplication, processing, distribution and any kind of exploitation outside the limits of copyright require the written consent of the respective author or creator. Downloads and copies of this site are only permitted for private, non-commercial use.
+        </p>
+        <p class="text-stone-700 mb-4">
+          Insofar as the content on this site was not created by the operator, the copyrights of third parties are observed. In particular, third-party content is identified as such. Should you nevertheless become aware of a copyright infringement, please inform me accordingly. Upon becoming aware of violations, I will remove such content immediately.
+        </p>
+      </section>
+    </div>
+  </article>
+</Layout>
+
+<style>
+  :global(.prose) {
+    @apply text-stone-700;
+  }
+  
+  :global(.prose h2) {
+    @apply text-stone-800 mt-8 mb-4;
+  }
+  
+  :global(.prose h3) {
+    @apply text-stone-800 mt-6 mb-3;
+  }
+  
+  :global(.prose p) {
+    @apply mb-4 leading-relaxed;
+  }
+  
+  :global(.prose a) {
+    @apply text-orange-600 hover:text-orange-700 underline;
+  }
+  
+  :global(.prose code) {
+    @apply bg-stone-100 px-2 py-1 rounded text-sm;
+  }
+  
+  :global(.prose ul, .prose ol) {
+    @apply mb-4 ml-6;
+  }
+  
+  :global(.prose li) {
+    @apply mb-2;
+  }
+</style>

@@ -3,7 +3,6 @@ import Layout from '../layouts/Layout.astro';
 import Hero from '../components/Hero.astro';
 import CareerTimeline from '../components/CareerTimeline.astro';
 import ProjectCard from '../components/ProjectCard.astro';
-import ContactForm from '../components/ContactForm.astro';
 import { getCollection } from 'astro:content';
 
 const projects = await getCollection('projects');
@@ -11,23 +10,14 @@ const sortedProjects = projects.sort((a, b) =>
   new Date(b.data.date).getTime() - new Date(a.data.date).getTime()
 );
 
-// Featured projects - including Toolstone
-const featuredProjects = [
-  {
-    title: 'Toolstone Privacy Manager',
-    description: 'A C# developed tool designed to support users in limiting tracking of Windows 10/11 privacy data.',
-    tags: ['C#', '.NET', 'Windows', 'Privacy'],
-    href: '/projects/toolstone-privacy-manager',
-    image: undefined,
-  },
-  ...sortedProjects.slice(0, 2).map(p => ({
-    title: p.data.title,
-    description: p.data.description,
-    tags: p.data.tags || [],
-    href: `/projects/${p.slug}`,
-    image: p.data.image,
-  })),
-];
+// Featured projects - using actual project data
+const featuredProjects = sortedProjects.map(p => ({
+  title: p.data.title,
+  description: p.data.description,
+  tags: p.data.tags || [],
+  href: `/projects/${p.slug}`,
+  image: p.data.image,
+}));
 ---
 
 <Layout title="Portfolio - Pascal Krason" description="Backend Developer & Systems Administrator">
@@ -58,6 +48,4 @@ const featuredProjects = [
       </div>
     </div>
   </section>
-  
-  <ContactForm />
 </Layout>

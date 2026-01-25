@@ -17,11 +17,11 @@ const linkHref = href || (slug ? `/projects/${slug}` : '#');
   class="group block glass-card overflow-hidden transition-all duration-300 hover:-translate-y-1 h-full flex flex-col"
 >
   {image && (
-    <div class="aspect-video bg-stone-100 overflow-hidden">
+    <div class="aspect-video bg-stone-100 overflow-hidden flex items-center justify-center">
       <img 
         src={image} 
         alt={title}
-        class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+        class="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
       />
     </div>
   )}

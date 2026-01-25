@@ -1,5 +1,6 @@
 ---
 import Navigation from '../components/Navigation.astro';
+import Footer from '../components/Footer.astro';
 import '../styles/global.css';
 
 interface Props {
@@ -25,5 +26,6 @@ const { title, description = 'Portfolio - Pascal Krason' } = Astro.props;
     <main class="relative z-10">
       <slot />
     </main>
+    <Footer />
   </body>
 </html>

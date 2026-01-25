@@ -1,9 +1,9 @@
 ---
-title: "Toolstone Privacy Manager"
+title: "Toolstone Identity Tracker"
 description: "A C# developed tool designed to support users in limiting tracking of Windows 10/11 privacy data."
 date: "2023-03-01"
 tags: ["C#", "Windows", "Privacy"]
-image: "/images/projects/Toolstone-3D-Privacy-Manager-1-768x768.jpg"
+image: "/images/projects/Toolstone-3D-Identity-Tracker-768x768.jpg"
 ---
 
 ## About the Project

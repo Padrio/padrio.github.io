@@ -1,5 +1,5 @@
 ---
-import Layout from '../layouts/Layout.astro';
+import Layout from '../../layouts/Layout.astro';
 import { getCollection } from 'astro:content';
 
 export async function getStaticPaths() {
@@ -22,22 +22,22 @@ const { Content } = await project.render();
   <article class="max-w-4xl mx-auto px-6 py-20 pt-32">
     <a 
       href="/#projekte" 
-      class="inline-flex items-center gap-2 text-gray-400 hover:text-gray-100 mb-8 transition-colors"
+      class="inline-flex items-center gap-2 text-stone-500 hover:text-orange-600 mb-8 transition-colors"
     >
       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
       </svg>
-      Zurück zu Projekten
+      Back to Projects
     </a>
     
     <header class="mb-8">
-      <h1 class="text-4xl md:text-5xl font-bold text-gray-100 mb-4">
+      <h1 class="text-4xl md:text-5xl font-bold text-stone-800 mb-4">
         {project.data.title}
       </h1>
-      <p class="text-xl text-gray-400 mb-4">
+      <p class="text-xl text-stone-600 mb-4">
         {project.data.description}
       </p>
-      <div class="flex items-center gap-4 text-sm text-gray-500">
+      <div class="flex items-center gap-4 text-sm text-stone-500">
         <time datetime={project.data.date}>
           {new Date(project.data.date).toLocaleDateString('de-DE', {
             year: 'numeric',
@@ -48,7 +48,7 @@ const { Content } = await project.render();
         {project.data.tags && project.data.tags.length > 0 && (
           <div class="flex flex-wrap gap-2">
             {project.data.tags.map((tag: string) => (
-              <span class="px-2 py-1 bg-dark-surface border border-dark-border text-gray-400 rounded text-xs">
+              <span class="px-2.5 py-1 text-xs bg-orange-100 text-orange-700 rounded-md transition-colors">
                 {tag}
               </span>
             ))}
@@ -57,17 +57,8 @@ const { Content } = await project.render();
       </div>
     </header>
     
-    {project.data.image && (
-      <div class="mb-8 rounded-xl overflow-hidden">
-        <img 
-          src={project.data.image} 
-          alt={project.data.title}
-          class="w-full h-auto"
-        />
-      </div>
-    )}
     
-    <div class="prose prose-invert prose-lg max-w-none">
+    <div class="prose prose-lg max-w-none">
       <Content />
     </div>
   </article>
@@ -75,15 +66,15 @@ const { Content } = await project.render();
 
 <style>
   :global(.prose) {
-    @apply text-gray-300;
+    @apply text-stone-700;
   }
   
   :global(.prose h2) {
-    @apply text-gray-100 mt-8 mb-4;
+    @apply text-stone-800 mt-8 mb-4;
   }
   
   :global(.prose h3) {
-    @apply text-gray-100 mt-6 mb-3;
+    @apply text-stone-800 mt-6 mb-3;
   }
   
   :global(.prose p) {
@@ -91,15 +82,15 @@ const { Content } = await project.render();
   }
   
   :global(.prose a) {
-    @apply text-gray-400 hover:text-gray-100 underline;
+    @apply text-orange-600 hover:text-orange-700 underline;
   }
   
   :global(.prose code) {
-    @apply bg-dark-surface px-2 py-1 rounded text-sm;
+    @apply bg-stone-100 px-2 py-1 rounded text-sm;
   }
   
   :global(.prose pre) {
-    @apply bg-dark-surface border border-dark-border rounded-xl p-4 overflow-x-auto;
+    @apply bg-white border border-stone-200 shadow-sm rounded-xl p-4 overflow-x-auto;
   }
   
   :global(.prose ul, .prose ol) {

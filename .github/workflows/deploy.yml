@@ -1,0 +1,44 @@
+name: Deploy to GitHub Pages
+
+on:
+  # Löst den Workflow bei jedem Push auf den main branch aus
+  push:
+    branches: [ main ]
+  # Erlaubt es dir, den Workflow manuell im "Actions" Tab zu starten
+  workflow_dispatch:
+
+# Setzt Berechtigungen für den GITHUB_TOKEN
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Erlaubt nur ein gleichzeitiges Deployment
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout your repository using git
+        uses: actions/checkout@v4
+      
+      - name: Install, build, and upload your site
+        # Die offizielle Astro Action erkennt automatisch deinen Paketmanager (npm, pnpm, yarn)
+        uses: withastro/action@v2
+        with:
+          node-version: 20
+          package-manager: npm@latest
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
