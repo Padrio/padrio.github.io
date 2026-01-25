@@ -155,13 +155,6 @@ declare module 'astro:content' {
   collection: "projects";
   data: InferEntrySchema<"projects">
 } & { render(): Render[".md"] };
-"toolstone-privacy-manager.md": {
-	id: "toolstone-privacy-manager.md";
-  slug: "toolstone-privacy-manager";
-  body: string;
-  collection: "projects";
-  data: InferEntrySchema<"projects">
-} & { render(): Render[".md"] };
 };
 
 	};
