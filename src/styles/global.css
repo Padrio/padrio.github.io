@@ -58,14 +58,15 @@
   
   /* Tech Stack Marquee */
   .marquee-container {
-    @apply overflow-hidden relative;
+    @apply overflow-hidden relative w-full;
     mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
     -webkit-mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
   }
   
   .marquee-content {
-    @apply flex gap-8 items-center;
+    @apply flex items-center;
     animation: marquee 25s linear infinite;
+    width: fit-content;
   }
   
   .marquee-content:hover {

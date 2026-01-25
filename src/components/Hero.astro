@@ -11,8 +11,8 @@ const techStack = [
 ];
 ---
 
-<section class="min-h-screen flex items-center justify-center px-6 pt-20 relative">
-  <div class="max-w-4xl mx-auto text-center">
+<section class="min-h-screen flex items-center justify-center px-4 sm:px-6 pt-20 relative overflow-x-hidden">
+  <div class="max-w-4xl mx-auto text-center w-full">
     <!-- Profile Image with Simple Pastel Border -->
     <div class="mb-8 flex justify-center animate-entrance">
       <div class="relative">
@@ -31,12 +31,12 @@ const techStack = [
     </div>
     
     <!-- Headline with Subtle Accent Underline -->
-    <h1 class="text-5xl md:text-7xl font-bold mb-4 tracking-tight text-stone-800 animate-entrance animate-entrance-delay-1 underline decoration-orange-300 decoration-2 underline-offset-4">
+    <h1 class="text-4xl sm:text-5xl md:text-7xl font-bold mb-4 tracking-tight text-stone-800 animate-entrance animate-entrance-delay-1 underline decoration-orange-300 decoration-2 underline-offset-4 px-4 break-words">
       Pascal Krason
     </h1>
     
     <!-- Subline -->
-    <p class="text-xl md:text-2xl text-stone-600 mb-8 max-w-2xl mx-auto animate-entrance animate-entrance-delay-2">
+    <p class="text-lg sm:text-xl md:text-2xl text-stone-600 mb-8 max-w-2xl mx-auto px-4 animate-entrance animate-entrance-delay-2 break-words">
       Proficient Systems Administrator and PHP Backend Developer
     </p>
     
@@ -64,22 +64,22 @@ const techStack = [
     </div>
     
     <!-- Tech Stack Marquee -->
-    <div class="animate-entrance animate-entrance-delay-4">
+    <div class="animate-entrance animate-entrance-delay-4 px-4">
       <p class="text-xs text-stone-500 uppercase tracking-widest mb-4">Tech Stack</p>
-      <div class="marquee-container max-w-xl mx-auto py-4">
+      <div class="marquee-container max-w-xl mx-auto py-4 overflow-hidden">
         <div class="marquee-content">
           <!-- First set of icons -->
-          <div class="flex items-center gap-8">
+          <div class="flex items-center gap-4 sm:gap-6 md:gap-8">
             {techStack.map((tech) => (
-              <div class="tech-icon flex items-center justify-center" title={tech.name}>
+              <div class="tech-icon flex items-center justify-center flex-shrink-0" title={tech.name}>
                 <Icon name={tech.icon} class="w-full h-full" />
               </div>
             ))}
           </div>
           <!-- Duplicate set for seamless loop -->
-          <div class="flex items-center gap-8">
+          <div class="flex items-center gap-4 sm:gap-6 md:gap-8">
             {techStack.map((tech) => (
-              <div class="tech-icon flex items-center justify-center" title={tech.name}>
+              <div class="tech-icon flex items-center justify-center flex-shrink-0" title={tech.name}>
                 <Icon name={tech.icon} class="w-full h-full" />
               </div>
             ))}
