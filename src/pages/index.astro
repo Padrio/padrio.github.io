@@ -18,6 +18,7 @@ const featuredProjects = [
     description: 'A C# developed tool designed to support users in limiting tracking of Windows 10/11 privacy data.',
     tags: ['C#', '.NET', 'Windows', 'Privacy'],
     href: '/projects/toolstone-privacy-manager',
+    image: undefined,
   },
   ...sortedProjects.slice(0, 2).map(p => ({
     title: p.data.title,
@@ -42,9 +43,9 @@ const featuredProjects = [
       <p class="text-stone-600 text-center mb-12 max-w-2xl mx-auto">
         A selection of projects I've worked on, showcasing my expertise in backend development and system administration.
       </p>
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
         {featuredProjects.map((project, index) => (
-          <div class="animate-entrance" style={`animation-delay: ${0.5 + index * 0.1}s;`}>
+          <div class="animate-entrance flex" style={`animation-delay: ${0.5 + index * 0.1}s;`}>
             <ProjectCard
               title={project.title}
               description={project.description}
