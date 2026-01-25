@@ -3,7 +3,7 @@ title: "WacheDigital Service Planning"
 description: "A modern web platform transforming volunteer fire department administration from paper-based processes to a centralized, process-oriented system with intelligent scheduling and hybrid digital-analog workflows."
 date: "2024-01-01"
 tags: ["PHP", "Laravel", "React", "InertiaJS", "REST-API", "Scheduling", "Fire Department"]
-image: "/images/projects/wachedigital-login.webp"
+image: "/images/projects/wachedigital-dienstplan.webp"
 ---
 
 ## About the Project
