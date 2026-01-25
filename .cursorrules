@@ -36,3 +36,4 @@ The goal is a friendly, inviting, and highly readable design that appeals to bot
 - Use `.astro` components.
 - Ensure accessibility (high contrast between text and background).
 - Keep it static and fast (GitHub Pages).
+- **NEVER manually write SVG paths.** Always use icon libraries (e.g., `astro-icon` with Iconify/simple-icons) instead of hardcoding SVG paths. Use the `Icon` component from `astro-icon/components` with icon names like `simple-icons:php`, `simple-icons:github`, etc.
