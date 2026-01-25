@@ -1,7 +1,7 @@
 ---
 title: "Amazon Autocode"
 description: "An automated SaaS platform for selling and delivering software licences and vouchers via Amazon. Developed in PHP 8.3 using Laravel and Orchid for the backend, it streamlines order management and licence delivery."
-date: "2024-01-01"
+date: "2024-02-01"
 tags: ["PHP", "Laravel", "Orchid", "SaaS", "Amazon", "E-Commerce"]
 image: "/images/projects/autocode.webp"
 ---

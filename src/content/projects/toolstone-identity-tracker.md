@@ -1,7 +1,7 @@
 ---
 title: "Toolstone Identity Tracker"
 description: "A C# developed tool designed to support users in limiting tracking of Windows 10/11 privacy data."
-date: "2023-03-01"
+date: "2023-05-01"
 tags: ["C#", "Windows", "Privacy"]
 image: "/images/projects/Toolstone-Identity-Tracker.webp"
 ---
