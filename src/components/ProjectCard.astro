@@ -1,0 +1,54 @@
+---
+interface Props {
+  title: string;
+  description: string;
+  slug?: string;
+  image?: string;
+  tags?: string[];
+  href?: string;
+}
+
+const { title, description, slug, image, tags, href } = Astro.props;
+const linkHref = href || (slug ? `/projects/${slug}` : '#');
+---
+
+<a 
+  href={linkHref}
+  class="group block glass-card overflow-hidden transition-all duration-300 hover:-translate-y-1"
+>
+  {image && (
+    <div class="aspect-video bg-stone-100 overflow-hidden">
+      <img 
+        src={image} 
+        alt={title}
+        class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+      />
+    </div>
+  )}
+  {!image && (
+    <div class="aspect-video bg-gradient-to-br from-stone-100 to-stone-50 flex items-center justify-center overflow-hidden">
+      <div class="text-stone-300 group-hover:text-orange-400 transition-colors">
+        <svg class="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+        </svg>
+      </div>
+    </div>
+  )}
+  <div class="p-4 md:p-6">
+    <h3 class="text-xl font-semibold text-stone-800 mb-2 group-hover:text-stone-900 transition-colors tracking-tight">
+      {title}
+    </h3>
+    <p class="text-stone-600 text-sm mb-4 line-clamp-2 leading-relaxed">
+      {description}
+    </p>
+    {tags && tags.length > 0 && (
+      <div class="flex flex-wrap gap-2">
+        {tags.map((tag) => (
+          <span class="px-2.5 py-1 text-xs bg-orange-100 text-orange-700 rounded-md transition-colors">
+            {tag}
+          </span>
+        ))}
+      </div>
+    )}
+  </div>
+</a>

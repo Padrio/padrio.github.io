@@ -1,0 +1,62 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Hero from '../components/Hero.astro';
+import CareerTimeline from '../components/CareerTimeline.astro';
+import ProjectCard from '../components/ProjectCard.astro';
+import ContactForm from '../components/ContactForm.astro';
+import { getCollection } from 'astro:content';
+
+const projects = await getCollection('projects');
+const sortedProjects = projects.sort((a, b) => 
+  new Date(b.data.date).getTime() - new Date(a.data.date).getTime()
+);
+
+// Featured projects - including Toolstone
+const featuredProjects = [
+  {
+    title: 'Toolstone Privacy Manager',
+    description: 'A C# developed tool designed to support users in limiting tracking of Windows 10/11 privacy data.',
+    tags: ['C#', '.NET', 'Windows', 'Privacy'],
+    href: '/projects/toolstone-privacy-manager',
+  },
+  ...sortedProjects.slice(0, 2).map(p => ({
+    title: p.data.title,
+    description: p.data.description,
+    tags: p.data.tags || [],
+    href: `/projects/${p.slug}`,
+    image: p.data.image,
+  })),
+];
+---
+
+<Layout title="Portfolio - Pascal Krason" description="Backend Developer & Systems Administrator">
+  <Hero />
+  
+  <CareerTimeline />
+  
+  <section id="projects" class="py-20 px-6 animate-entrance" style="animation-delay: 0.4s;">
+    <div class="max-w-7xl mx-auto">
+      <h2 class="text-4xl md:text-5xl font-bold text-stone-800 mb-4 text-center tracking-tight">
+        Selected Works
+      </h2>
+      <p class="text-stone-600 text-center mb-12 max-w-2xl mx-auto">
+        A selection of projects I've worked on, showcasing my expertise in backend development and system administration.
+      </p>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {featuredProjects.map((project, index) => (
+          <div class="animate-entrance" style={`animation-delay: ${0.5 + index * 0.1}s;`}>
+            <ProjectCard
+              title={project.title}
+              description={project.description}
+              href={project.href}
+              image={project.image}
+              tags={project.tags}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+  
+  <ContactForm />
+</Layout>

@@ -1,0 +1,73 @@
+---
+import ExperienceCard from './ExperienceCard.astro';
+
+const experiences = [
+  {
+    company: 'World4You Internet Services GmbH',
+    role: 'Software Engineer / DevOps',
+    period: 'Oct 2017 - Today',
+    description: 'Development and maintenance of web applications, infrastructure automation, and DevOps practices. Working with PHP, Linux systems, and cloud technologies.',
+    isCurrent: true,
+  },
+  {
+    company: 'Raiffeisen Software GmbH',
+    role: 'DevOps',
+    period: 'Jan 2017 - Oct 2017',
+    description: 'DevOps engineering focusing on automation, CI/CD pipelines, and infrastructure management for financial software solutions.',
+    isCurrent: false,
+  },
+  {
+    company: 'Porsche',
+    role: 'Developer Internship',
+    period: 'July 2016 - Aug 2016',
+    description: 'Software development internship working on internal tools and applications. Gained experience in enterprise software development practices.',
+    isCurrent: false,
+  },
+  {
+    company: 'T-Systems',
+    role: 'Owner / Self Employed',
+    period: 'Aug 2011 - July 2017',
+    description: 'Independent contractor providing software development and IT consulting services. Managed client projects and delivered custom solutions.',
+    isCurrent: false,
+  },
+];
+---
+
+<section id="career" class="py-20 px-6 animate-entrance" style="animation-delay: 0.2s;">
+  <div class="max-w-4xl mx-auto">
+    <h2 class="text-4xl md:text-5xl font-bold text-stone-800 mb-4 text-center tracking-tight">
+      My Career Journey
+    </h2>
+    <p class="text-stone-600 text-center mb-12 max-w-2xl mx-auto">
+      A timeline of my professional experience in software development and system administration.
+    </p>
+    
+    <div class="relative">
+      <!-- Vertical Timeline Line with Warm Gradient -->
+      <div class="absolute left-8 top-0 bottom-0 w-0.5 bg-gradient-to-b from-orange-400/50 via-stone-300 to-stone-200 hidden md:block"></div>
+      
+      <!-- Experience Cards -->
+      <div class="space-y-8">
+        {experiences.map((exp, index) => (
+          <div class="relative flex items-start gap-6 animate-entrance" style={`animation-delay: ${0.3 + index * 0.1}s;`}>
+            <!-- Timeline Dot -->
+            <div class="hidden md:flex flex-shrink-0 items-center justify-center w-16 h-16 relative z-10">
+              <div class={`w-4 h-4 rounded-full border-2 transition-colors ${exp.isCurrent ? 'bg-orange-500 border-orange-400 shadow-lg shadow-orange-500/20' : 'bg-stone-300 border-stone-400'}`}></div>
+            </div>
+            
+            <!-- Experience Card -->
+            <div class="flex-1">
+              <ExperienceCard
+                company={exp.company}
+                role={exp.role}
+                period={exp.period}
+                description={exp.description}
+                isCurrent={exp.isCurrent}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+</section>

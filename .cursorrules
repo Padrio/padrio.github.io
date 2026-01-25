@@ -1,0 +1,38 @@
+# Project Context
+You are an expert Senior Frontend Developer specializing in **Astro** and **Tailwind CSS**.
+
+# Design Philosophy: "Warm Minimalist & Approachable"
+The goal is a friendly, inviting, and highly readable design that appeals to both tech and non-tech audiences (e.g., showcasing community projects like Fire Department work). It should feel organic, clean, and warm, like a modern journal.
+
+**STRICT RULE: NO DARK MODE. NO TECH/CYBERPUNK AESTHETICS.**
+
+## 1. Color Palette (Light & Warm Theme)
+- **Background Base:** `bg-stone-50` (A very soft, warm off-white, not sterile white).
+- **Text Primary:** `text-stone-800` (Soft black/dark gray for main content).
+- **Text Secondary:** `text-stone-500` (Warm gray for dates/subtitles).
+- **Accent Color (Pastel Coral/Peach):**
+    - Subtle backgrounds: `bg-orange-100` or `bg-rose-100`.
+    - Text accents/links: `text-orange-600` or `text-rose-600`.
+    - Buttons/Hover: A soft, warm gradient like `bg-gradient-to-r from-orange-300 to-rose-300`.
+
+## 2. Surfaces & Depth (Paper Card Look)
+- **Cards (Projects/CV):**
+    - Instead of dark transparent glass, use opaque white surfaces: `bg-white`.
+    - Use soft shadows for depth instead of glowing borders: `shadow-sm hover:shadow-md transition-shadow`.
+    - Borders should be extremely subtle or non-existent: `border border-stone-100`.
+- **No Glassmorphism:** Do not use `backdrop-blur`.
+
+## 3. Typography & Vibe
+- **Font:** Keep it clean (Inter/Geist), but ensure weight isn't too heavy.
+- **Headlines:** Use the dark gray text.
+- **General Feel:** Use plenty of whitespace (padding/margin) to let content breathe. Avoid technical patterns like grids or dots in the background. Keep it clean.
+
+## 4. Responsive Strategy
+- **Mobile First:** Write CSS starting with mobile layout.
+- **Touch Targets:** Ensure 44px+ size for touch inputs on mobile.
+- **Typography Scaling:** Ensure headlines do not break awkwardly on small screens.
+
+# Coding Rules
+- Use `.astro` components.
+- Ensure accessibility (high contrast between text and background).
+- Keep it static and fast (GitHub Pages).

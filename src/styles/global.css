@@ -1,0 +1,125 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    /* Light mode - warm and friendly */
+  }
+  
+  body {
+    @apply bg-stone-50 text-stone-800 antialiased;
+    font-family: 'Inter', system-ui, sans-serif;
+    position: relative;
+    overflow-x: hidden;
+  }
+}
+
+@layer components {
+  /* Paper-Card Look - Solid white with soft shadows */
+  .glass-card {
+    @apply bg-white border border-stone-200 rounded-xl transition-all duration-300 shadow-sm;
+    position: relative;
+    z-index: 1;
+  }
+  
+  .glass-card:hover {
+    @apply border-stone-300 shadow-md -translate-y-0.5;
+  }
+  
+  /* Gradient Text - Warm tones */
+  .gradient-text {
+    @apply bg-clip-text text-transparent bg-gradient-to-b from-stone-900 via-stone-800 to-stone-700;
+  }
+  
+  /* Entrance Animation Classes */
+  .animate-entrance {
+    opacity: 0;
+    animation: slideUp 0.8s ease-out forwards;
+  }
+  
+  .animate-entrance-delay-1 {
+    animation-delay: 0.1s;
+  }
+  
+  .animate-entrance-delay-2 {
+    animation-delay: 0.2s;
+  }
+  
+  .animate-entrance-delay-3 {
+    animation-delay: 0.3s;
+  }
+  
+  .animate-entrance-delay-4 {
+    animation-delay: 0.4s;
+  }
+  
+  /* Tech Stack Marquee */
+  .marquee-container {
+    @apply overflow-hidden relative;
+    mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+    -webkit-mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+  }
+  
+  .marquee-content {
+    @apply flex gap-8 items-center;
+    animation: marquee 25s linear infinite;
+  }
+  
+  .marquee-content:hover {
+    animation-play-state: paused;
+  }
+  
+  /* Tech Icon */
+  .tech-icon {
+    @apply w-8 h-8 md:w-10 md:h-10 grayscale opacity-40 transition-all duration-300;
+  }
+  
+  .tech-icon:hover {
+    @apply grayscale-0 opacity-70;
+  }
+  
+  /* Badge */
+  .badge {
+    @apply px-2 py-0.5 text-xs font-medium rounded-full;
+  }
+  
+  .badge-current {
+    @apply bg-orange-100 text-orange-700 border border-orange-200;
+  }
+  
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  .tracking-tight {
+    letter-spacing: -0.025em;
+  }
+}
+
+/* Keyframe Animations */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+

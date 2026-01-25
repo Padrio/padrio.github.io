@@ -1,0 +1,112 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { getCollection } from 'astro:content';
+
+export async function getStaticPaths() {
+  const projects = await getCollection('projects');
+  return projects.map((project) => ({
+    params: { slug: project.slug },
+    props: { project },
+  }));
+}
+
+interface Props {
+  project: any;
+}
+
+const { project } = Astro.props;
+const { Content } = await project.render();
+---
+
+<Layout title={`${project.data.title} - Portfolio`} description={project.data.description}>
+  <article class="max-w-4xl mx-auto px-6 py-20 pt-32">
+    <a 
+      href="/#projekte" 
+      class="inline-flex items-center gap-2 text-gray-400 hover:text-gray-100 mb-8 transition-colors"
+    >
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+      </svg>
+      Zurück zu Projekten
+    </a>
+    
+    <header class="mb-8">
+      <h1 class="text-4xl md:text-5xl font-bold text-gray-100 mb-4">
+        {project.data.title}
+      </h1>
+      <p class="text-xl text-gray-400 mb-4">
+        {project.data.description}
+      </p>
+      <div class="flex items-center gap-4 text-sm text-gray-500">
+        <time datetime={project.data.date}>
+          {new Date(project.data.date).toLocaleDateString('de-DE', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+          })}
+        </time>
+        {project.data.tags && project.data.tags.length > 0 && (
+          <div class="flex flex-wrap gap-2">
+            {project.data.tags.map((tag: string) => (
+              <span class="px-2 py-1 bg-dark-surface border border-dark-border text-gray-400 rounded text-xs">
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    </header>
+    
+    {project.data.image && (
+      <div class="mb-8 rounded-xl overflow-hidden">
+        <img 
+          src={project.data.image} 
+          alt={project.data.title}
+          class="w-full h-auto"
+        />
+      </div>
+    )}
+    
+    <div class="prose prose-invert prose-lg max-w-none">
+      <Content />
+    </div>
+  </article>
+</Layout>
+
+<style>
+  :global(.prose) {
+    @apply text-gray-300;
+  }
+  
+  :global(.prose h2) {
+    @apply text-gray-100 mt-8 mb-4;
+  }
+  
+  :global(.prose h3) {
+    @apply text-gray-100 mt-6 mb-3;
+  }
+  
+  :global(.prose p) {
+    @apply mb-4 leading-relaxed;
+  }
+  
+  :global(.prose a) {
+    @apply text-gray-400 hover:text-gray-100 underline;
+  }
+  
+  :global(.prose code) {
+    @apply bg-dark-surface px-2 py-1 rounded text-sm;
+  }
+  
+  :global(.prose pre) {
+    @apply bg-dark-surface border border-dark-border rounded-xl p-4 overflow-x-auto;
+  }
+  
+  :global(.prose ul, .prose ol) {
+    @apply mb-4 ml-6;
+  }
+  
+  :global(.prose li) {
+    @apply mb-2;
+  }
+</style>
