@@ -6,52 +6,70 @@ const experiences = [
     company: 'Stoll von Gáti GmbH',
     role: 'Professional PHP Developer',
     period: 'Dec 2024 - Today',
+    shortDescription: 'Building and maintaining RESTful APIs with Laminas Framework and Doctrine ORM. Driving modernization efforts including SVN to Git migration and CI/CD pipeline rebuilding.',
     description: 'Backend PHP development with a focus on building and maintaining RESTful APIs using the Laminas Framework and Doctrine ORM. Involved in the conception and implementation of complex customer projects, including finders and configurators. Alongside feature development, I drive internal modernization efforts such as migrating from SVN to Git, rebuilding CI/CD pipelines during the Jenkins phase-out, and supporting deployment processes. I also help integrate AI-assisted workflows to improve development efficiency and quality.',
+    skills: ['PHP', 'Laminas', 'Doctrine', 'REST API', 'CI/CD'],
     isCurrent: true,
   },
   {
     company: 'PohlMedia Distribution UG',
     role: 'Software Engineer',
     period: 'Oct 2022 - Nov 2024',
+    shortDescription: "Built the 'Toolstone' privacy brand with C#. Developed a SaaS platform automating software distribution on Amazon.",
     description: "As a software developer, I was instrumental in building the 'Toolstone' brand with C#, emphasizing privacy and security. I maintained and updated partner brand websites using WordPress and Elementor, managed customer service to ensure efficient support, and spearheaded the development of a SaaS platform that automated software distribution on Amazon via discount codes—including handling physical deliveries.",
+    skills: ['C#', 'SaaS', 'WordPress', 'Amazon API'],
     isCurrent: false,
   },
   {
     company: 'AP Supplements UG',
     role: 'Founder',
     period: 'Jan 2019 - Nov 2023',
+    shortDescription: 'Founded and operated a dietary supplements company. Built and optimized e-commerce infrastructure with focus on digital marketing.',
     description: 'As the founder of my company, which distributes dietary supplements, I gained extensive experience in sourcing, labeling, marketing, and importing products. My primary focus was on implementing digital marketing strategies—especially through social media—which allowed me to effectively position our products and drive business growth. Leveraging my technical skills, I established and optimized an e-commerce shop to ensure a smooth sales process and provide excellent customer service.',
+    skills: ['E-Commerce', 'Marketing', 'Entrepreneurship'],
     isCurrent: false,
   },
   {
     company: 'FoundersLane',
     role: 'Professional PHP Developer',
     period: 'Jan 2019 - July 2019',
+    shortDescription: 'DevOps and PHP development in agile environment. Managed Kubernetes clusters and implemented Docker-based solutions.',
     description: "As a DevOps specialist and PHP developer, I applied agile methods and worked extensively with PHP throughout our projects. I managed Kubernetes clusters using Rancher, implemented Docker-based solutions for containerization, and continuously fostered DevOps culture. My responsibilities also included working with SQL and developing a rapid prototyping framework to accelerate our workflow.",
+    skills: ['PHP', 'Kubernetes', 'Docker', 'DevOps'],
     isCurrent: false,
   },
   {
     company: 'CHECK24',
     role: 'Junior PHP Developer',
     period: 'Aug 2017 - Dez 2019',
+    shortDescription: 'Backend development on Core/API team. Built APIs with Zend Framework and designed microservice architectures.',
     description: "As a backend PHP developer on the Core/API team, I was responsible for developing APIs using Zend Framework and Swagger, designing microservice-based architectures, and working extensively with MySQL and SQL databases. I set up CI/CD pipelines with Jenkins, managed version control with Git, and embraced agile workflows using Jira.",
+    skills: ['PHP', 'Zend', 'MySQL', 'Microservices', 'Jenkins'],
     isCurrent: false,
   },
   {
     company: 'Hostisan',
     role: 'Owner',
     period: 'Oct 2015 - May 2017',
+    shortDescription: 'Server hosting business focused on virtualized Linux servers with Proxmox/QEMU and automated provisioning.',
     description: "As the owner of a server hosting business, I was responsible for the setup, management, and automation of virtualized Linux servers. My focus was on developing efficient hosting strategies using Proxmox and QEMU for virtualization, and optimizing networking and infrastructure. I automated processes with Jenkins and designed bespoke software solutions to ensure smooth and scalable server provisioning.",
+    skills: ['Linux', 'Proxmox', 'Virtualization', 'Networking'],
     isCurrent: false,
   },
   {
     company: 'Portunity',
     role: 'Developer (Apprenticeship)',
     period: 'Aug 2014 - Aug 2017',
+    shortDescription: 'Backend development with PHP, MySQL, and frameworks like Zend/Doctrine. Linux server management and storage solutions.',
     description: "As a software developer, I focused on backend development using PHP and object-oriented programming, working with MySQL databases and frameworks like Zend and Doctrine. My role included managing Linux servers, setting up virtual environments using Vagrant, and implementing storage solutions with S3 and Ceph. I routinely solved technical challenges, established VPN connections, and ensured reliable code management with Git.",
+    skills: ['PHP', 'MySQL', 'Linux', 'Zend', 'Doctrine'],
     isCurrent: false,
   },
 ];
+
+const visibleExperiences = experiences.slice(0, 3);
+const hiddenExperiences = experiences.slice(3);
+const hiddenCount = hiddenExperiences.length;
 ---
 
 <section id="career" class="py-20 px-6 animate-entrance" style="animation-delay: 0.2s;">
@@ -67,9 +85,9 @@ const experiences = [
       <!-- Vertical Timeline Line with Warm Gradient -->
       <div class="absolute left-8 top-0 bottom-0 w-0.5 bg-gradient-to-b from-orange-400/50 via-stone-300 to-stone-200 hidden md:block"></div>
       
-      <!-- Experience Cards -->
+      <!-- Visible Experience Cards -->
       <div class="space-y-8">
-        {experiences.map((exp, index) => (
+        {visibleExperiences.map((exp, index) => (
           <div class="relative flex items-start gap-6 animate-entrance" style={`animation-delay: ${0.3 + index * 0.1}s;`}>
             <!-- Timeline Dot -->
             <div class="hidden md:flex flex-shrink-0 items-center justify-center w-16 h-16 relative z-10">
@@ -82,13 +100,83 @@ const experiences = [
                 company={exp.company}
                 role={exp.role}
                 period={exp.period}
+                shortDescription={exp.shortDescription}
                 description={exp.description}
+                skills={exp.skills}
                 isCurrent={exp.isCurrent}
               />
             </div>
           </div>
         ))}
       </div>
+      
+      <!-- Hidden Experience Cards -->
+      <div id="hidden-experiences" class="hidden space-y-8 mt-8">
+        {hiddenExperiences.map((exp, index) => (
+          <div class="relative flex items-start gap-6">
+            <!-- Timeline Dot -->
+            <div class="hidden md:flex flex-shrink-0 items-center justify-center w-16 h-16 relative z-10">
+              <div class={`w-4 h-4 rounded-full border-2 transition-colors ${exp.isCurrent ? 'bg-orange-500 border-orange-400 shadow-lg shadow-orange-500/20' : 'bg-stone-300 border-stone-400'}`}></div>
+            </div>
+            
+            <!-- Experience Card -->
+            <div class="flex-1">
+              <ExperienceCard
+                company={exp.company}
+                role={exp.role}
+                period={exp.period}
+                shortDescription={exp.shortDescription}
+                description={exp.description}
+                skills={exp.skills}
+                isCurrent={exp.isCurrent}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+      
+      <!-- Show more / Show less Button -->
+      {hiddenCount > 0 && (
+        <div class="flex justify-center mt-8">
+          <button
+            type="button"
+            id="show-more-experiences"
+            class="flex items-center gap-2 text-orange-600 hover:text-orange-700 transition-colors text-sm font-medium"
+            aria-expanded="false"
+            data-hidden-count={hiddenCount}
+          >
+            <span id="show-more-text">Show {hiddenCount} more positions</span>
+            <svg id="show-more-icon" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+        </div>
+      )}
     </div>
   </div>
 </section>
+
+<script>
+  const button = document.getElementById('show-more-experiences');
+  const hiddenBlock = document.getElementById('hidden-experiences');
+  const textSpan = document.getElementById('show-more-text');
+  const icon = document.getElementById('show-more-icon');
+
+  if (button && hiddenBlock && textSpan && icon) {
+    const hiddenCount = Number(button.getAttribute('data-hidden-count')) || 0;
+    button.addEventListener('click', () => {
+      const isExpanded = button.getAttribute('aria-expanded') === 'true';
+      if (isExpanded) {
+        hiddenBlock.classList.add('hidden');
+        textSpan.textContent = `Show ${hiddenCount} more positions`;
+        icon.classList.remove('rotate-180');
+        button.setAttribute('aria-expanded', 'false');
+      } else {
+        hiddenBlock.classList.remove('hidden');
+        textSpan.textContent = 'Show less';
+        icon.classList.add('rotate-180');
+        button.setAttribute('aria-expanded', 'true');
+      }
+    });
+  }
+</script>

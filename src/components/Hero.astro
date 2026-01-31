@@ -1,20 +1,23 @@
 ---
 import { Icon } from 'astro-icon/components';
 
-const techStack = [
+// Kernkompetenzen - prominent dargestellt
+const coreStack = [
   { name: 'PHP', icon: 'simple-icons:php' },
-  { name: 'Linux', icon: 'simple-icons:linux' },
-  { name: 'Docker', icon: 'simple-icons:docker' },
-  { name: 'Git', icon: 'simple-icons:git' },
-  { name: 'MySQL', icon: 'simple-icons:mysql' },
-  { name: 'Nginx', icon: 'simple-icons:nginx' },
-  { name: 'Laravel', icon: 'simple-icons:laravel' },
-  { name: 'React', icon: 'simple-icons:react' },
-  { name: 'Kubernetes', icon: 'simple-icons:kubernetes' },
-  { name: 'Jenkins', icon: 'simple-icons:jenkins' },
-  { name: 'C#', icon: 'simple-icons:csharp' },
-  { name: 'Doctrine', icon: 'simple-icons:doctrine' },
   { name: 'Laminas', icon: 'simple-icons:zend' },
+  { name: 'Docker', icon: 'simple-icons:docker' },
+  { name: 'Linux', icon: 'simple-icons:linux' },
+];
+
+// Sekundäre Skills - dezenter
+const secondaryStack = [
+  { name: 'Laravel', icon: 'simple-icons:laravel' },
+  { name: 'MySQL', icon: 'simple-icons:mysql' },
+  { name: 'Git', icon: 'simple-icons:git' },
+  { name: 'Nginx', icon: 'simple-icons:nginx' },
+  { name: 'Kubernetes', icon: 'simple-icons:kubernetes' },
+  { name: 'React', icon: 'simple-icons:react' },
+  { name: 'Jenkins', icon: 'simple-icons:jenkins' },
 ];
 ---
 
@@ -37,14 +40,14 @@ const techStack = [
       </div>
     </div>
     
-    <!-- Headline with Subtle Accent Underline -->
-    <h1 class="text-4xl sm:text-5xl md:text-7xl font-bold mb-4 tracking-tight text-stone-800 animate-entrance animate-entrance-delay-1 underline decoration-orange-300 decoration-2 underline-offset-4 px-4 break-words">
+    <!-- Headline -->
+    <h1 class="text-4xl sm:text-5xl md:text-7xl font-bold mb-4 tracking-tight text-stone-800 animate-entrance animate-entrance-delay-1 px-4 break-words">
       Pascal Krason
     </h1>
     
     <!-- Subline -->
     <p class="text-lg sm:text-xl md:text-2xl text-stone-600 mb-8 max-w-2xl mx-auto px-4 animate-entrance animate-entrance-delay-2 break-words">
-      Proficient Systems Administrator and PHP Backend Developer
+      Backend Developer & DevOps Engineer
     </p>
     
     <!-- Social Icons -->
@@ -70,29 +73,48 @@ const techStack = [
       </a>
     </div>
     
-    <!-- Tech Stack Marquee -->
+    <!-- Tech Stack -->
     <div class="animate-entrance animate-entrance-delay-4 px-4">
-      <p class="text-xs text-stone-500 uppercase tracking-widest mb-4">Tech Stack</p>
-      <div class="marquee-container max-w-xl mx-auto py-4 overflow-hidden">
-        <div class="marquee-content gap-4 sm:gap-6 md:gap-8">
-          <!-- First set of icons -->
-          <div class="flex items-center gap-4 sm:gap-6 md:gap-8">
-            {techStack.map((tech) => (
-              <div class="tech-icon flex items-center justify-center flex-shrink-0" title={tech.name}>
-                <Icon name={tech.icon} class="w-full h-full" />
-              </div>
-            ))}
+      <p class="text-xs text-stone-500 uppercase tracking-widest mb-6">Tech Stack</p>
+      
+      <!-- Core Stack - Prominent -->
+      <div class="flex items-center justify-center gap-6 sm:gap-8 mb-4">
+        {coreStack.map((tech) => (
+          <div 
+            class="flex flex-col items-center gap-2 group cursor-default"
+            title={tech.name}
+          >
+            <div class="w-10 h-10 sm:w-12 sm:h-12 text-stone-700 group-hover:text-orange-600 transition-colors">
+              <Icon name={tech.icon} class="w-full h-full" />
+            </div>
+            <span class="text-xs text-stone-500 group-hover:text-stone-700 transition-colors hidden sm:block">
+              {tech.name}
+            </span>
           </div>
-          <!-- Duplicate set for seamless loop -->
-          <div class="flex items-center gap-4 sm:gap-6 md:gap-8">
-            {techStack.map((tech) => (
-              <div class="tech-icon flex items-center justify-center flex-shrink-0" title={tech.name}>
-                <Icon name={tech.icon} class="w-full h-full" />
-              </div>
-            ))}
-          </div>
-        </div>
+        ))}
       </div>
+      
+      <!-- Secondary Stack - Subtle -->
+      <div class="flex items-center justify-center gap-4 sm:gap-6 opacity-50 hover:opacity-70 transition-opacity">
+        {secondaryStack.map((tech) => (
+          <div 
+            class="w-5 h-5 sm:w-6 sm:h-6 text-stone-400"
+            title={tech.name}
+          >
+            <Icon name={tech.icon} class="w-full h-full" />
+          </div>
+        ))}
+      </div>
+    </div>
+    
+    <!-- Scroll Indicator -->
+    <div class="absolute bottom-8 left-1/2 -translate-x-1/2 animate-entrance animate-bounce" style="animation-delay: 1s;">
+      <a href="#career" class="flex flex-col items-center gap-2 text-stone-400 hover:text-stone-600 transition-colors">
+        <span class="text-xs uppercase tracking-widest">Scroll</span>
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+        </svg>
+      </a>
     </div>
   </div>
 </section>

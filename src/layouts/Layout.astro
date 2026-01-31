@@ -3,23 +3,68 @@ import Navigation from '../components/Navigation.astro';
 import Footer from '../components/Footer.astro';
 import '../styles/global.css';
 
+// Self-hosted Inter font (no external requests to Google)
+import '@fontsource/inter/300.css';
+import '@fontsource/inter/400.css';
+import '@fontsource/inter/500.css';
+import '@fontsource/inter/600.css';
+import '@fontsource/inter/700.css';
+
 interface Props {
   title: string;
   description?: string;
+  image?: string;
 }
 
-const { title, description = 'Portfolio - Pascal Krason' } = Astro.props;
+// Default OG image: use profile photo (exists in public/images). Override with image prop or add public/images/og-image.png for a dedicated share image.
+const { title, description = 'Backend Developer & DevOps Engineer', image = '/images/profile.jpg' } = Astro.props;
+const canonicalURL = new URL(Astro.url.pathname, Astro.site || 'https://pkrason.de');
+
+// JSON-LD Schema
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Person",
+  "name": "Pascal Krason",
+  "jobTitle": "Backend Developer & DevOps Engineer",
+  "url": "https://pkrason.de",
+  "sameAs": [
+    "https://github.com/Padrio",
+    "https://www.linkedin.com/in/pascal-krason-b74028326/"
+  ]
+};
 ---
 
 <!doctype html>
 <html lang="de">
   <head>
     <meta charset="UTF-8" />
-    <meta name="description" content={description} />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="generator" content={Astro.generator} />
+    
+    <!-- Primary Meta Tags -->
     <title>{title}</title>
+    <meta name="title" content={title} />
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonicalURL} />
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={canonicalURL} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={image} />
+    <meta property="og:locale" content="de_DE" />
+    
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content={canonicalURL} />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={image} />
+    
+    <!-- JSON-LD Schema -->
+    <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
   </head>
   <body>
     <Navigation />
