@@ -48,6 +48,32 @@ tags: ["React", "TypeScript"]
 Hier kommt der Inhalt des Projekts...
 ```
 
+## Bilder in WebP umwandeln (macOS)
+
+Projektbilder sollten im WebP-Format gespeichert werden, da es deutlich kleinere Dateigrößen bei vergleichbarer Qualität bietet.
+
+### cwebp installieren
+
+```bash
+brew install webp
+```
+
+### Einzelnes Bild umwandeln
+
+```bash
+cwebp -q 80 input.png -o output.webp
+```
+
+`-q 80` setzt die Qualität auf 80% (empfohlen für Projektbilder).
+
+### Alle PNGs in einem Ordner umwandeln
+
+```bash
+for file in public/images/projects/*.png; do
+  cwebp -q 80 "$file" -o "${file%.png}.webp"
+done
+```
+
 ## Projektstruktur
 
 ```
