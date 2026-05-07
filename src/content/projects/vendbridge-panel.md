@@ -34,15 +34,23 @@ Chips are the primary identity in Vendbridge. The panel handles the full lifecyc
 
 Every sale follows a three-step protocol: reserve credit, dispense the product, then commit or cancel the transaction. Each step writes to an append-only `LedgerEntry` table whose rows are linked by an SHA-256 hash chain — `chain_hash = SHA256(prev_hash || payload_hash || timestamp || nonce)`. The chain can be verified end-to-end with an Artisan command, which detects any silent modification of historical rows. Refunds are time-limited (30 days for operators, 90 days for administrators) and produce a mirrored negative entry rather than mutating the original record.
 
+![Append-only ledger with SHA-256 hash-chained transaction entries](/images/projects/vendbridge-transactions.webp)
+
 ### Device Configuration & OTA Firmware
 
 Machines pull their configuration — slot-to-product mapping, active price list, feature flags — from an ETag-cached endpoint. Operators define this configuration in the panel using a drag-and-drop slot editor, then trigger a reload via the next heartbeat. Firmware updates work the same way: an administrator uploads a signed image, picks the target devices, and the OTA endpoint serves the manifest the next time each machine checks in.
+
+![Product catalogue with prices, categories, and slot-to-product mapping](/images/projects/vendbridge-products.webp)
+
+![Device fleet overview with status, configuration, and OTA firmware deployment](/images/projects/vendbridge-devices.webp)
 
 ### Audit, Roles & Two-Factor Authentication
 
 Authorisation is layered on `spatie/laravel-permission` with three roles: admin, operator, and auditor. TOTP-based 2FA is mandatory for administrators and optional for operators, with hashed recovery codes for lockout recovery. Every write across the system — chip changes, device updates, user invitations, firmware deployments — produces an `AuditEvent` row that the auditor role can filter and export, but no role can edit or delete.
 
 ![Login screen with Vendbridge branding](/images/projects/vendbridge-login.webp)
+
+![Reports and audit log views available to auditors for filtering and export](/images/projects/vendbridge-reports.webp)
 
 ### Multi-Tenancy
 
