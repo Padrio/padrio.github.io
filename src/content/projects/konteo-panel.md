@@ -1,16 +1,16 @@
 ---
-title: "Vendbridge Management Panel"
-description: "A Laravel + React control panel for networked beverage vending machines with RFID-based cashless payment, append-only transaction ledgers, and OTA firmware rollouts to ESP32 devices."
-date: "2026-05-02"
+title: "Konteo Management Panel"
+description: "The Laravel + React control plane of Konteo — a cashless vending platform built on RFID chips, append-only transaction ledgers, and OTA firmware rollouts to ESP32-equipped beverage machines."
+date: "2026-05-21"
 tags: ["PHP", "Laravel", "React", "InertiaJS", "TypeScript", "shadcn/ui", "MariaDB", "RFID/IoT"]
-image: "/images/projects/vendbridge-dashboard.webp"
+image: "/images/projects/konteo-dashboard.webp"
 ---
 
 ## About the Project
 
-Operators of small to mid-sized beverage vending fleets traditionally rely on coin and bill mechanisms or per-machine prepaid cards — both of which scale poorly: cash has to be collected, cards live on a single device, and reconciling sales across a fleet is a manual exercise. Vendbridge replaces that model with a centralised platform where ESP32-equipped Sielaff FK 185 vending machines authenticate cashless transactions against RFID chips held by employees, members, or tenants of an organisation.
+Konteo is a cashless payment platform for beverage and snack vending fleets. ESP32-equipped machines authenticate transactions against RFID chips held by employees, members, or tenants of an organisation, and every cent of credit lives on the central panel rather than on the card itself. That model replaces the traditional mix of coin mechanisms and per-machine prepaid cards — both of which scale poorly: cash has to be collected, cards live on a single device, and reconciling sales across a fleet is a manual exercise.
 
-The panel is the operator's cockpit. It manages the chip lifecycle, products and price lists, slot assignments per machine, firmware rollouts, and an immutable audit trail. Three distinct roles share the same interface: administrators configure tenants, push firmware, and approve high-value refunds; operators handle day-to-day chip and device management; auditors hold read-only access to the ledger and reports. Every action against a vending machine — credit reservation, dispense, settlement, refund — flows through the panel and lands in a tamper-evident ledger.
+The Management Panel is the operator cockpit at the heart of Konteo. It manages the chip lifecycle, products and price lists, slot assignments per machine, firmware rollouts, and an immutable audit trail. Three distinct roles share the same interface: administrators configure tenants, push firmware, and approve high-value refunds; operators handle day-to-day chip and device management; auditors hold read-only access to the ledger and reports. Every action against a vending machine — credit reservation, dispense, settlement, refund — flows through the panel and lands in a tamper-evident ledger.
 
 ## Technologies
 
@@ -26,39 +26,39 @@ The panel is the operator's cockpit. It manages the chip lifecycle, products and
 
 ### RFID Chip & Credit Management
 
-Chips are the primary identity in Vendbridge. The panel handles the full lifecycle — registration, top-ups, daily and weekly purchase limits, category locks (e.g. blocking age-verified products on a chip without proof of age), and bulk CSV import for fleet-wide onboarding. UIDs are stored as SHA-256 hashes rather than plaintext, and every chip carries an explicit status (active, locked, retired) that the firmware enforces at the point of sale.
+Chips are the primary identity in Konteo. The panel handles the full lifecycle — registration, top-ups, daily and weekly purchase limits, category locks (e.g. blocking age-verified products on a chip without proof of age), and bulk CSV import for fleet-wide onboarding. UIDs are stored as SHA-256 hashes rather than plaintext, and every chip carries an explicit status (active, locked, retired) that the firmware enforces at the point of sale.
 
-![Chip management with status flags and bulk actions](/images/projects/vendbridge-chips.webp)
+![Chip management with status flags and bulk actions](/images/projects/konteo-chips.webp)
 
 ### Tamper-Evident Transaction Ledger
 
 Every sale follows a three-step protocol: reserve credit, dispense the product, then commit or cancel the transaction. Each step writes to an append-only `LedgerEntry` table whose rows are linked by an SHA-256 hash chain — `chain_hash = SHA256(prev_hash || payload_hash || timestamp || nonce)`. The chain can be verified end-to-end with an Artisan command, which detects any silent modification of historical rows. Refunds are time-limited (30 days for operators, 90 days for administrators) and produce a mirrored negative entry rather than mutating the original record.
 
-![Append-only ledger with SHA-256 hash-chained transaction entries](/images/projects/vendbridge-transactions.webp)
+![Append-only ledger with SHA-256 hash-chained transaction entries](/images/projects/konteo-transactions.webp)
 
 ### Device Configuration & OTA Firmware
 
 Machines pull their configuration — slot-to-product mapping, active price list, feature flags — from an ETag-cached endpoint. Operators define this configuration in the panel using a drag-and-drop slot editor, then trigger a reload via the next heartbeat. Firmware updates work the same way: an administrator uploads a signed image, picks the target devices, and the OTA endpoint serves the manifest the next time each machine checks in.
 
-![Product catalogue with prices, categories, and slot-to-product mapping](/images/projects/vendbridge-products.webp)
+![Product catalogue with prices, categories, and slot-to-product mapping](/images/projects/konteo-products.webp)
 
-![Device fleet overview with status, configuration, and OTA firmware deployment](/images/projects/vendbridge-devices.webp)
+![Device fleet overview with status, configuration, and OTA firmware deployment](/images/projects/konteo-devices.webp)
 
 ### Audit, Roles & Two-Factor Authentication
 
 Authorisation is layered on `spatie/laravel-permission` with three roles: admin, operator, and auditor. TOTP-based 2FA is mandatory for administrators and optional for operators, with hashed recovery codes for lockout recovery. Every write across the system — chip changes, device updates, user invitations, firmware deployments — produces an `AuditEvent` row that the auditor role can filter and export, but no role can edit or delete.
 
-![Login screen with Vendbridge branding](/images/projects/vendbridge-login.webp)
+![Login screen with Konteo branding](/images/projects/konteo-login.webp)
 
-![Reports and audit log views available to auditors for filtering and export](/images/projects/vendbridge-reports.webp)
+![Reports and audit log views available to auditors for filtering and export](/images/projects/konteo-reports.webp)
 
 ### Multi-Tenancy
 
-A single Vendbridge instance can host multiple operator organisations side by side. Isolation is enforced at the row level through an `OrganizationScope` global scope and a `BelongsToOrganization` trait applied to every tenant-bound model. There is no per-tenant database, no shared schema migration to coordinate, and no cross-tenant query path that does not require an explicit, audited `withoutGlobalScope` call.
+A single Konteo instance can host multiple operator organisations side by side. Isolation is enforced at the row level through an `OrganizationScope` global scope and a `BelongsToOrganization` trait applied to every tenant-bound model. There is no per-tenant database, no shared schema migration to coordinate, and no cross-tenant query path that does not require an explicit, audited `withoutGlobalScope` call.
 
 ### External Registrar API
 
-Chip enrolment often happens outside the panel — at a reception desk, a member portal, or an existing identity system. Vendbridge exposes a Bearer-token API with three scoped permissions (`chip.read`, `chip.write`, `chip.topup`) so an external registrar application can create chips, adjust limits, and credit balances without ever touching the operator UI.
+Chip enrolment often happens outside the panel — at a reception desk, a member portal, or an existing identity system. Konteo exposes a Bearer-token API with three scoped permissions (`chip.read`, `chip.write`, `chip.topup`) so an external registrar application can create chips, adjust limits, and credit balances without ever touching the operator UI.
 
 ## Challenges
 

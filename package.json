@@ -10,6 +10,7 @@
     "astro": "astro"
   },
   "dependencies": {
+    "@astrojs/sitemap": "3.2.1",
     "@astrojs/tailwind": "^5.1.0",
     "@fontsource/inter": "^5.2.8",
     "@iconify-json/simple-icons": "^1.2.67",

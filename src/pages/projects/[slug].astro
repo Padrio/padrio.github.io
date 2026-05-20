@@ -34,9 +34,28 @@ const readingTime = Math.max(1, Math.ceil(words / 200));
 
 // Filter headings for TOC (h2 and h3 only)
 const tocHeadings = headings.filter(h => h.depth === 2 || h.depth === 3);
+
+// SoftwareApplication structured data for richer SEO surface
+const projectJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": project.data.title,
+  "description": project.data.description,
+  ...(project.data.image && { "image": `https://pkrason.de${project.data.image}` }),
+  "url": `https://pkrason.de/projects/${project.slug}`,
+  "datePublished": project.data.date,
+  "author": {
+    "@type": "Person",
+    "name": "Pascal Krason",
+    "url": "https://pkrason.de"
+  },
+  "applicationCategory": "BusinessApplication",
+  ...(project.data.tags && { "keywords": project.data.tags.join(", ") })
+};
 ---
 
-<Layout title={`${project.data.title} - Portfolio`} description={project.data.description}>
+<Layout title={`${project.data.title} - Portfolio`} description={project.data.description} image={project.data.image}>
+  <script type="application/ld+json" set:html={JSON.stringify(projectJsonLd)} is:inline />
   <!-- Scroll Progress Indicator -->
   <div id="progress-bar" class="fixed top-[65px] left-0 h-0.5 bg-gradient-to-r from-orange-500 to-orange-400 z-40 transition-all duration-75" style="width: 0%"></div>
   
