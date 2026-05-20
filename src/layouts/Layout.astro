@@ -65,6 +65,12 @@ const jsonLd = {
     
     <!-- JSON-LD Schema -->
     <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+
+    <!-- Microsoft Clarity (heatmaps & session recordings) -->
+    <script>
+      import Clarity from '@microsoft/clarity';
+      Clarity.init('wu9fh588ka');
+    </script>
   </head>
   <body>
     <Navigation />
