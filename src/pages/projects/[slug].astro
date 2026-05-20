@@ -50,7 +50,8 @@ const projectJsonLd = {
     "url": "https://pkrason.de"
   },
   "applicationCategory": "BusinessApplication",
-  ...(project.data.tags && { "keywords": project.data.tags.join(", ") })
+  ...(project.data.tags && { "keywords": project.data.tags.join(", ") }),
+  ...(project.data.demo && { "sameAs": [project.data.demo] })
 };
 ---
 

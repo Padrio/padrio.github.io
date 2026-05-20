@@ -4,11 +4,12 @@ description: "A cross-platform desktop companion to the Konteo Management Panel 
 date: "2026-05-21"
 tags: ["Go", "Wails", "Alpine.js", "Tailwind CSS", "NFC/RFID", "OpenAPI", "Cross-Platform"]
 image: "/images/projects/konteo-provision-issue.webp"
+demo: "https://konteo.de"
 ---
 
 ## About the Project
 
-In the Konteo ecosystem, a chip is the user's identity at the vending machine — a MIFARE Classic 1K card whose UID is bound to a credit balance, purchase limits, and category permissions stored in the Management Panel. Issuing those chips, topping them up, and diagnosing problems with them used to mean keeping a browser open next to a USB NFC reader, copying UIDs by hand, and hoping the operator typed them correctly. Konteo Provision replaces that step with a single desktop application built specifically for the chip-handling workflow.
+In the [Konteo](https://konteo.de) ecosystem, a chip is the user's identity at the vending machine — a MIFARE Classic 1K card whose UID is bound to a credit balance, purchase limits, and category permissions stored in the Management Panel. Issuing those chips, topping them up, and diagnosing problems with them used to mean keeping a browser open next to a USB NFC reader, copying UIDs by hand, and hoping the operator typed them correctly. Konteo Provision replaces that step with a single desktop application built specifically for the chip-handling workflow.
 
 The tool runs on macOS, Windows, and Linux as a single signed-by-OS-keychain binary. It speaks PC/SC to an ACR122U USB NFC reader, reads the UID from any tapped card, and synchronises the result with the Konteo Registrar API over a Bearer-token connection. All state — balances, ledger entries, flags — stays in the panel; the card itself is treated purely as a hardware bearer token. The result is an offline-tolerant, single-purpose tool that fits next to a reception desk, an HR onboarding station, or a temporary event counter.
 

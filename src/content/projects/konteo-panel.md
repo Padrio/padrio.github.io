@@ -4,11 +4,12 @@ description: "The Laravel + React control plane of Konteo — a cashless vending
 date: "2026-05-21"
 tags: ["PHP", "Laravel", "React", "InertiaJS", "TypeScript", "shadcn/ui", "MariaDB", "RFID/IoT"]
 image: "/images/projects/konteo-dashboard.webp"
+demo: "https://konteo.de"
 ---
 
 ## About the Project
 
-Konteo is a cashless payment platform for beverage and snack vending fleets. ESP32-equipped machines authenticate transactions against RFID chips held by employees, members, or tenants of an organisation, and every cent of credit lives on the central panel rather than on the card itself. That model replaces the traditional mix of coin mechanisms and per-machine prepaid cards — both of which scale poorly: cash has to be collected, cards live on a single device, and reconciling sales across a fleet is a manual exercise.
+[Konteo](https://konteo.de) is a cashless payment platform for beverage and snack vending fleets. ESP32-equipped machines authenticate transactions against RFID chips held by employees, members, or tenants of an organisation, and every cent of credit lives on the central panel rather than on the card itself. That model replaces the traditional mix of coin mechanisms and per-machine prepaid cards — both of which scale poorly: cash has to be collected, cards live on a single device, and reconciling sales across a fleet is a manual exercise.
 
 The Management Panel is the operator cockpit at the heart of Konteo. It manages the chip lifecycle, products and price lists, slot assignments per machine, firmware rollouts, and an immutable audit trail. Three distinct roles share the same interface: administrators configure tenants, push firmware, and approve high-value refunds; operators handle day-to-day chip and device management; auditors hold read-only access to the ledger and reports. Every action against a vending machine — credit reservation, dispense, settlement, refund — flows through the panel and lands in a tamper-evident ledger.
 
