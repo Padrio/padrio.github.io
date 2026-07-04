@@ -4,6 +4,7 @@ description: "A C# developed tool designed to support users in limiting tracking
 date: "2023-03-01"
 tags: ["C#", "Windows", "Privacy"]
 image: "/images/projects/Toolstone-Privacy-Manager.webp"
+featured: false
 ---
 
 ## About the Project

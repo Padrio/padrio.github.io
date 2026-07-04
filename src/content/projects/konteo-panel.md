@@ -5,6 +5,7 @@ date: "2026-05-21"
 tags: ["PHP", "Laravel", "React", "InertiaJS", "TypeScript", "shadcn/ui", "MariaDB", "RFID/IoT"]
 image: "/images/projects/konteo-dashboard.webp"
 demo: "https://konteo.de"
+flagship: true
 ---
 
 ## About the Project

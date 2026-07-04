@@ -24,3 +24,8 @@ pnpm-debug.log*
 
 # Astro generated
 .astro/
+# design handoff bundles
+*.zip
+
+# playwright artifacts
+.playwright-mcp/

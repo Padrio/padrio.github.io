@@ -6,36 +6,18 @@ export default {
     extend: {
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
       },
-      colors: {
-        dark: {
-          bg: '#0a0a0a',
-          surface: '#1a1a1a',
-          border: '#2a2a2a',
-        }
+      maxWidth: {
+        content: '1120px',
       },
       animation: {
-        'fade-in': 'fadeIn 0.8s ease-out forwards',
-        'slide-up': 'slideUp 0.8s ease-out forwards',
-        'marquee': 'marquee 25s linear infinite',
-        'glow-pulse': 'glowPulse 3s ease-in-out infinite',
+        'pulse-dot': 'pulseDot 2.4s infinite',
       },
       keyframes: {
-        fadeIn: {
-          '0%': { opacity: '0' },
-          '100%': { opacity: '1' },
-        },
-        slideUp: {
-          '0%': { opacity: '0', transform: 'translateY(20px)' },
-          '100%': { opacity: '1', transform: 'translateY(0)' },
-        },
-        marquee: {
-          '0%': { transform: 'translateX(0%)' },
-          '100%': { transform: 'translateX(-50%)' },
-        },
-        glowPulse: {
-          '0%, 100%': { opacity: '0.4', transform: 'scale(1)' },
-          '50%': { opacity: '0.6', transform: 'scale(1.05)' },
+        pulseDot: {
+          '0%, 100%': { boxShadow: '0 0 0 0 rgba(16,185,129,0.45)' },
+          '70%': { boxShadow: '0 0 0 7px rgba(16,185,129,0)' },
         },
       },
     },

@@ -6,45 +6,60 @@ interface Props {
   image?: string;
   tags?: string[];
   href?: string;
+  flagship?: boolean;
 }
 
-const { title, description, slug, image, tags, href } = Astro.props;
+const { title, description, slug, image, tags, href, flagship = false } = Astro.props;
 const linkHref = href || (slug ? `/projects/${slug}` : '#');
 ---
 
-<a 
+<a
   href={linkHref}
-  class="group block glass-card overflow-hidden transition-all duration-300 hover:-translate-y-1 h-full flex flex-col"
+  class="group relative flex flex-col h-full bg-white border border-stone-200 rounded-[18px] overflow-hidden shadow-sm transition-[transform,box-shadow] duration-150 motion-safe:hover:-translate-y-[3px] hover:shadow-[0_16px_32px_-16px_rgba(28,25,23,0.18)]"
 >
-  {image && (
-    <div class="aspect-video bg-stone-100 overflow-hidden flex items-center justify-center">
-      <img 
-        src={image} 
-        alt={title}
-        class="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
+  <div class="relative h-[190px] overflow-hidden bg-stone-100">
+    {image ? (
+      <img
+        src={image}
+        alt={`Screenshot of ${title}`}
+        loading="lazy"
+        class="w-full h-full object-cover object-top motion-safe:transition-transform motion-safe:duration-[450ms] motion-safe:ease-[cubic-bezier(.16,.84,.44,1)] motion-safe:group-hover:scale-105"
       />
-    </div>
-  )}
-  {!image && (
-    <div class="aspect-video bg-gradient-to-br from-stone-100 to-stone-50 flex items-center justify-center overflow-hidden">
-      <div class="text-stone-300 group-hover:text-orange-400 transition-colors">
-        <svg class="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    ) : (
+      <div class="w-full h-full bg-gradient-to-br from-stone-100 to-stone-50 flex items-center justify-center">
+        <svg class="w-16 h-16 text-stone-300 group-hover:text-orange-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
         </svg>
       </div>
-    </div>
-  )}
-  <div class="p-4 md:p-6 flex flex-col flex-1">
-    <h3 class="text-xl font-semibold text-stone-800 mb-2 group-hover:text-stone-900 transition-colors tracking-tight">
+    )}
+    {flagship && (
+      <span class="absolute top-3 left-3 font-mono text-[10.5px] font-semibold text-orange-700 bg-orange-100/95 px-[9px] py-1 rounded-md tracking-[0.04em]">
+        FLAGSHIP
+      </span>
+    )}
+  </div>
+
+  <!-- hover arrow chip -->
+  <span
+    aria-hidden="true"
+    class="absolute top-3 right-3 z-[3] w-[34px] h-[34px] rounded-full bg-orange-600 flex items-center justify-center shadow-[0_6px_16px_-6px_rgba(234,88,12,0.6)] opacity-0 -translate-y-1.5 scale-75 transition-[opacity,transform] duration-300 group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100 motion-reduce:transition-none"
+  >
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M7 17L17 7"/><path d="M7 7h10v10"/>
+    </svg>
+  </span>
+
+  <div class="p-6 pt-[22px] flex flex-col flex-1">
+    <h3 class="font-bold text-[19px] text-stone-900 mb-[9px]">
       {title}
     </h3>
-    <p class="text-stone-600 text-sm mb-4 line-clamp-2 leading-relaxed flex-1">
+    <p class="text-[14.5px] leading-relaxed text-stone-500 mb-4 flex-1 line-clamp-2">
       {description}
     </p>
     {tags && tags.length > 0 && (
-      <div class="flex flex-wrap gap-2 mt-auto">
+      <div class="flex flex-wrap gap-1.5 mt-auto">
         {tags.map((tag) => (
-          <span class="px-2.5 py-1 text-xs bg-orange-100 text-orange-700 rounded-md transition-colors">
+          <span class="text-[11.5px] text-stone-600 bg-stone-100 border border-stone-200/70 px-[9px] py-[3px] rounded-md">
             {tag}
           </span>
         ))}

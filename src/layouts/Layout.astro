@@ -3,21 +3,30 @@ import Navigation from '../components/Navigation.astro';
 import Footer from '../components/Footer.astro';
 import '../styles/global.css';
 
-// Self-hosted Inter font (no external requests to Google)
-import '@fontsource/inter/300.css';
+// Self-hosted fonts (no external requests to Google)
 import '@fontsource/inter/400.css';
 import '@fontsource/inter/500.css';
 import '@fontsource/inter/600.css';
 import '@fontsource/inter/700.css';
+import '@fontsource/inter/800.css';
+import '@fontsource/jetbrains-mono/400.css';
+import '@fontsource/jetbrains-mono/500.css';
+import '@fontsource/jetbrains-mono/600.css';
 
 interface Props {
   title: string;
   description?: string;
   image?: string;
+  lang?: string;
 }
 
 // Default OG image: use profile photo (exists in public/images). Override with image prop or add public/images/og-image.png for a dedicated share image.
-const { title, description = 'Backend Developer & DevOps Engineer', image = '/images/profile.jpg' } = Astro.props;
+const {
+  title,
+  description = 'Backend Developer & Solutions Architect',
+  image = '/images/profile.jpg',
+  lang = 'en',
+} = Astro.props;
 const canonicalURL = new URL(Astro.url.pathname, Astro.site || 'https://pkrason.de');
 
 // JSON-LD Schema
@@ -25,7 +34,7 @@ const jsonLd = {
   "@context": "https://schema.org",
   "@type": "Person",
   "name": "Pascal Krason",
-  "jobTitle": "Backend Developer & DevOps Engineer",
+  "jobTitle": "Backend Developer & Solutions Architect",
   "url": "https://pkrason.de",
   "sameAs": [
     "https://github.com/Padrio",
@@ -35,19 +44,22 @@ const jsonLd = {
 ---
 
 <!doctype html>
-<html lang="de">
+<html lang={lang}>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="generator" content={Astro.generator} />
-    
+
+    <!-- Marks JS availability before first paint so scroll-reveal styles only apply with JS -->
+    <script is:inline>document.documentElement.classList.add('js');</script>
+
     <!-- Primary Meta Tags -->
     <title>{title}</title>
     <meta name="title" content={title} />
     <meta name="description" content={description} />
     <link rel="canonical" href={canonicalURL} />
-    
+
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
     <meta property="og:url" content={canonicalURL} />
@@ -55,14 +67,14 @@ const jsonLd = {
     <meta property="og:description" content={description} />
     <meta property="og:image" content={image} />
     <meta property="og:locale" content="de_DE" />
-    
+
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:url" content={canonicalURL} />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={image} />
-    
+
     <!-- JSON-LD Schema -->
     <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
 
@@ -73,10 +85,14 @@ const jsonLd = {
     </script>
   </head>
   <body>
+    <a href="#main" class="skip-link">Skip to content</a>
     <Navigation />
-    <main class="relative z-10">
+    <main id="main" class="relative z-10">
       <slot />
     </main>
     <Footer />
+    <script>
+      import '../scripts/reveal.js';
+    </script>
   </body>
 </html>

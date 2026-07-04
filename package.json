@@ -13,6 +13,7 @@
     "@astrojs/sitemap": "3.2.1",
     "@astrojs/tailwind": "^5.1.0",
     "@fontsource/inter": "^5.2.8",
+    "@fontsource/jetbrains-mono": "^5.2.8",
     "@iconify-json/simple-icons": "^1.2.67",
     "@microsoft/clarity": "^1.0.2",
     "astro": "^4.0.0",
