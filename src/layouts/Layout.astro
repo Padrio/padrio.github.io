@@ -27,6 +27,8 @@ const {
   image = '/images/profile.jpg',
   lang = 'en',
 } = Astro.props;
+const ogLocales: Record<string, string> = { en: 'en_US', de: 'de_DE' };
+const ogLocale = ogLocales[lang] ?? ogLocales.en;
 const canonicalURL = new URL(Astro.url.pathname, Astro.site || 'https://pkrason.de');
 
 // JSON-LD Schema
@@ -66,7 +68,7 @@ const jsonLd = {
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:image" content={image} />
-    <meta property="og:locale" content="de_DE" />
+    <meta property="og:locale" content={ogLocale} />
 
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
