@@ -1,0 +1,39 @@
+name: PR Build Check
+
+on:
+  # Läuft bei jedem Pull Request gegen main, bevor gemerged (und damit deployt) wird
+  pull_request:
+    branches: [ main ]
+
+# Der Check liest nur den Code, er deployt nichts
+permissions:
+  contents: read
+
+# Pro PR läuft nur der jeweils neueste Check
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Job-Key = Name des Status-Kontexts. Bewusst nicht "build", weil deploy.yml
+  # denselben Key nutzt und dieser Name von der Branch-Protection eingefroren wird.
+  pr-build:
+    runs-on: ubuntu-latest
+    # Der Build dauert ~25 s; ohne Angabe gilt das Default von 360 Minuten
+    timeout-minutes: 10
+    steps:
+      - name: Checkout your repository using git
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        # Node 20 — identisch zur Version in deploy.yml
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build site
+        run: npm run build
