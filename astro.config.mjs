@@ -19,6 +19,14 @@ export default defineConfig({
     '/projects/vendprovision': {
       status: 301,
       destination: '/projects/konteo-provision'
+    },
+    '/projects/toolstone-identity-tracker': {
+      status: 301,
+      destination: '/'
+    },
+    '/projects/toolstone-privacy-manager': {
+      status: 301,
+      destination: '/'
     }
   },
   markdown: {
