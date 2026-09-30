@@ -73,7 +73,7 @@ Die Detailseite wird für **jedes** Projekt erzeugt, unabhängig von `featured`.
 
 ## Die 13 harten Regeln für pkrason.de — gelten ohne Ausnahme
 
-1. **Niemals direkt auf `main` pushen.** Ein Push auf `main` ist ein Production-Deploy (`.github/workflows/deploy.yml` deployt bei jedem Push auf `main` live). Jede Änderung: eigener Branch → Pull Request → Review durch den Code Auditor → **das Board merged**.
+1. **Niemals direkt auf `main` pushen.** Ein Push auf `main` ist ein Production-Deploy (`.github/workflows/deploy.yml` deployt bei jedem Push auf `main` live). Jede Änderung: eigener Branch → Pull Request → Review durch den Code Auditor (Pflicht bei jedem PR; QA Auditor und Security & Ops Auditor zusätzlich nach der Review-Matrix unten) → **das Board merged**.
 2. **Git-Identität:** Commits laufen als „Pascal Krason <p.krason@icloud.com>" (global in `~/.gitconfig`, nicht überschreiben). **Keine `Co-Authored-By`-Zeilen** in Commits oder PR-Beschreibungen — weder Claude noch Paperclip. Claude Code fügt sie standardmäßig hinzu; prüfe jede Commit-Message und jeden PR-Body, bevor du ihn abschickst.
    *Der erste Satz ist im Agent-Workspace nicht erfüllbar — siehe **Runtime-Realität**, „Die Commit-Identität liegt nicht beim Agent". Nicht dagegen anarbeiten. Das `Co-Authored-By`-Verbot gilt uneingeschränkt.*
 3. **Vor jedem PR muss `npm run build` fehlerfrei durchlaufen.** Das Ergebnis wird im zugehörigen Issue dokumentiert. Es gibt weder Tests noch Linter — der Build ist das einzige Qualitätsgate.
@@ -133,12 +133,29 @@ Im Agent-Workspace verifiziert. Diese Punkte kosten sonst jeden Agent einen Fehl
 
 ---
 
+## Review-Matrix
+
+Wer ein PR reviewen muss, hängt davon ab, was der Diff berührt. Der companyweite Default „drei Auditoren pro Phase" gilt für pkrason.de **nicht**; diese Matrix ist für dieses Repository die maßgebliche Fassung.
+
+| Auslöser im Diff | Erforderliches Review |
+|---|---|
+| Jeder PR, ohne Ausnahme | **Code Auditor** |
+| Rendering, Layout, Responsive-Verhalten, Accessibility — `src/components/`, `src/layouts/`, `src/pages/`, `src/styles/global.css`, `tailwind.config.mjs`, `src/scripts/reveal.js`, Projektbilder | zusätzlich **QA Auditor** |
+| Third-Party-Skripte, Tracker, Analytics, externe Requests, `src/pages/legal.astro`, `src/pages/privacy.astro`, `.github/workflows/`, `package.json`/`package-lock.json` | zusätzlich **Security & Ops Auditor** |
+| Nur Dokumentation, Frontmatter oder Projekttext ohne Darstellungsänderung | **Code Auditor** allein |
+
+Welche Reviews nötig sind, entscheidet Chief of Staff beim Zuweisen und schreibt es in das Issue. Nennt das Issue nur den Code Auditor, ist genau ein Review korrekt — melde das nicht als Abweichung. Hältst du ein zusätzliches Review für nötig, das im Issue nicht steht: Kommentar an Chief of Staff, nicht eigenmächtig weglassen oder hinzufügen.
+
+---
+
 ## Arbeitsablauf für ein Issue
 
 1. Eigenen Worktree anlegen, Branch nach obigem Schema.
 2. `npm ci`, implementieren, `npm run build` — Ausgabe ins Issue.
 3. Commit ohne `Co-Authored-By`-Trailer (Regel 2), Branch pushen.
 4. PR über `create-pull-request` öffnen, Link ins Issue.
-5. **Review-Child-Issue anlegen** und dem Code Auditor zuweisen, dann das eigene Issue per `blockedByIssueIds` darauf blocken. Das Implementierungs-Issue bleibt beim Implementer; die Blocker-Kante ist es, die den `issue_blockers_resolved`-Wake für den Fix-Loop auslöst. Das Review-Issue muss **self-contained** sein — Ziel, Akzeptanzkriterien, Branch/Commit/PR, Scope-Grenzen —, weil der Auditor das Parent-Issue womöglich nicht lesen kann. Nicht selbst mergen, das macht das Board.
-   *Nicht `in_review` + Zuweisung an den Auditor: die Plattform lehnt das mit `invalid_issue_disposition` ab, weil eine Agent-Zuweisung nicht als Review-Pfad zählt (nur ein menschlicher Reviewer, eine Interaction oder ein Monitor).*
-6. Blocker: Frage als Kommentar, Status `blocked`, Chief of Staff @-erwähnen (Regel 12).
+5. Review anfordern: für **jeden im Issue genannten Auditor** ein eigenes Review-Child-Issue anlegen und das eigene Issue per `blockedByIssueIds` an diese Child-Issues hängen. Das Review-Issue muss selbsterklärend sein — Ziel, Definition of Done, Branch und PR-Link, relevante Regeln, und was ausdrücklich nicht in Scope ist. Der Auditor kann das Elternissue möglicherweise nicht lesen. **Das Issue bleibt bei dir**; weise es keinem Auditor zu.
+6. Findings abarbeiten. Ändert ein Fix den Diff wesentlich, eine neue Review-Runde als neue Child-Issues aufsetzen — keine geschlossenen Reviews wiederbeleben.
+7. Sind alle Reviews `done` und die Findings behandelt: Issue auf `in_review` mit Verweis auf PR und Review-Verdikte. Der PR liegt jetzt beim Board. **Nicht selbst mergen.**
+8. Nach dem Merge Deploy-Check: `git fetch origin main && git log --oneline origin/main -3`, dann https://pkrason.de prüfen. Danach das Issue auf `done`.
+9. Blocker: Frage als Kommentar, Status `blocked`, Chief of Staff @-erwähnen (Regel 12).
