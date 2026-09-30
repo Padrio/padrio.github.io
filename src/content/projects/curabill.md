@@ -54,6 +54,10 @@ For guardians managing many wards, CuraBill offers a batch billing workflow: sel
 
 The dashboard provides five KPI cards at a glance — total wards, active guardianships, total invoices, open drafts, and exported revenue. A batch billing prompt highlights how many guardianships are eligible for the next billing period with a direct link. Statute of limitations warnings flag unexported invoices whose 15-month deadline is approaching within the next three months.
 
+## The Statute as a Test Suite
+
+In CuraBill, the statute defines the correct result — not the code. The VBVG billing rules are pinned down as test cases: the 16 remuneration combinations, the month counting under §§ 187, 188 BGB, the phase transition from month 12 to 13, and the reference date method of § 9 Abs. 3 VBVG. The test suite is therefore the specification, and the implementation is simply the current best way of satisfying it. When the legislature changes a rule, a test changes first, and the failing build shows exactly what the code still has to catch up on. That also makes refactoring safe: as long as the rules stay green, the internals are free to change.
+
 ## Challenges
 
 The primary challenge was translating the intricate German legal framework — particularly the VBVG 2026 with its 16 remuneration combinations and the BGB's date arithmetic rules — into reliable, testable software. Edge cases around phase transitions (month 12 to 13), partial months, leap years, and mid-period status changes required careful modeling to ensure every cent is calculated correctly.
