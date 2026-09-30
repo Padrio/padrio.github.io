@@ -39,23 +39,26 @@ const secondaryStack = ['Laravel', 'MySQL', 'Git', 'Nginx', 'Kubernetes', 'React
   </p>
 
   <!-- availability — CTA into the contact section -->
-  <a
-    href="#contact"
-    data-reveal
-    class="group inline-flex items-center gap-2.5 mt-4 pl-[15px] pr-[13px] min-h-[44px] border border-stone-200 bg-white rounded-full shadow-sm hover:border-orange-300 hover:shadow transition-[border-color,box-shadow]"
-  >
-    <span
-      aria-hidden="true"
-      class="w-[7px] h-[15px] rounded-[1px] bg-emerald-600 motion-safe:animate-caret group-hover:animate-none group-focus-visible:animate-none"
-    ></span>
-    <span class="font-mono text-[11.5px] sm:text-xs text-stone-700 tracking-[0.01em]">
-      Available for projects &amp; freelance work
-    </span>
-    <span
-      aria-hidden="true"
-      class="text-stone-400 group-hover:text-orange-600 group-hover:translate-x-0.5 transition-[color,transform]"
-    >&rarr;</span>
-  </a>
+  <!-- data-reveal sits on the wrapper: it sets the `transition` shorthand, which on the
+       anchor itself would override the hover transition below -->
+  <div data-reveal class="mt-[18px]">
+    <a
+      href="#contact"
+      class="group inline-flex items-center gap-2.5 pl-[15px] pr-[13px] min-h-[44px] border border-stone-200 bg-white rounded-full shadow-sm hover:border-orange-300 hover:shadow focus-visible:border-orange-300 transition-[border-color,box-shadow]"
+    >
+      <span
+        aria-hidden="true"
+        class="w-[7px] h-[15px] rounded-[1px] bg-emerald-600 motion-safe:animate-caret group-hover:animate-none group-focus-visible:animate-none"
+      ></span>
+      <span class="font-mono text-xs text-stone-700 tracking-[0.01em]">
+        Available for projects<span class="hidden sm:inline"> &amp; freelance work</span>
+      </span>
+      <span
+        aria-hidden="true"
+        class="text-stone-500 group-hover:text-orange-600 group-focus-visible:text-orange-600 group-hover:translate-x-0.5 group-focus-visible:translate-x-0.5 transition-[color,transform]"
+      >&rarr;</span>
+    </a>
+  </div>
 
   <!-- socials -->
   <div data-reveal class="flex gap-3 mt-6">
