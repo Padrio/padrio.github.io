@@ -56,7 +56,7 @@ The dashboard provides five KPI cards at a glance — total wards, active guardi
 
 ## The Statute as a Test Suite
 
-In CuraBill, the statute defines the correct result — not the code. The VBVG billing rules are pinned down as test cases: the 16 remuneration combinations, the month counting under §§ 187, 188 BGB, the phase transition from month 12 to 13, and the reference date method of § 9 Abs. 3 VBVG. The test suite is therefore the specification, and the implementation is simply the current best way of satisfying it. When the legislature changes a rule, a test changes first, and the failing build shows exactly what the code still has to catch up on. That also makes refactoring safe: as long as the rules stay green, the internals are free to change.
+In CuraBill, the statute defines the correct result — not the code. The VBVG billing rules are pinned down as test cases: the 16 remuneration combinations, the guardianship-month arithmetic under §§ 187, 188 BGB, the phase transition from month 12 to 13, and the reference date method of § 9 Abs. 3 VBVG. The test suite is therefore the specification, and the implementation is simply the current best way of satisfying it. When the legislature changes a rule, the test for that rule changes with it, and the suite shows exactly where the implementation still has to follow. That also makes refactoring safe: as long as the rules stay green, the internals are free to change.
 
 ## Challenges
 
