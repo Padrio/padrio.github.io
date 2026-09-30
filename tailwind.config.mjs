@@ -12,12 +12,12 @@ export default {
         content: '1120px',
       },
       animation: {
-        'pulse-dot': 'pulseDot 2.4s infinite',
+        caret: 'caret 1.2s step-end infinite',
       },
       keyframes: {
-        pulseDot: {
-          '0%, 100%': { boxShadow: '0 0 0 0 rgba(16,185,129,0.45)' },
-          '70%': { boxShadow: '0 0 0 7px rgba(16,185,129,0)' },
+        caret: {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0' },
         },
       },
     },
