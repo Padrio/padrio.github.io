@@ -2,9 +2,11 @@
 
 Ein minimalistisches Portfolio mit Astro und Tailwind CSS.
 
+Das Design-System heißt „Warm Minimalist“: heller Grund (`stone-50`), weiße Karten mit dezenten Schatten, Akzent in Orange/Rose. Es gibt bewusst keinen Dark Mode. Details stehen in [`.cursorrules`](.cursorrules); verbindliche Projektregeln und Arbeitsabläufe in [`CLAUDE.md`](CLAUDE.md).
+
 ## Features
 
-- 🎨 Dark Mode Design
+- 🎨 „Warm Minimalist“-Design (helles Theme, kein Dark Mode)
 - 📱 Responsive Layout
 - ⚡ Statische Seiten-Generierung
 - 📝 Markdown-basierte Projekte
@@ -34,23 +36,39 @@ npm run build
 
 Neue Projekte können einfach als Markdown-Dateien im Ordner `src/content/projects/` hinzugefügt werden.
 
-Beispiel:
+Beispiel (alle Felder aus `src/content/config.ts`):
 
 ```markdown
 ---
 title: "Mein Projekt"
 description: "Eine kurze Beschreibung"
 date: "2024-01-01"
-image: "/images/projekt.jpg"
+image: "/images/projects/mein-projekt.webp"
 tags: ["React", "TypeScript"]
+github: "https://github.com/user/mein-projekt"
+demo: "https://example.com"
+featured: true
+flagship: false
 ---
 
 Hier kommt der Inhalt des Projekts...
 ```
 
+| Feld | Pflicht | Beschreibung |
+|---|---|---|
+| `title` | ja | Titel des Projekts |
+| `description` | ja | Kurzbeschreibung |
+| `date` | ja | Datum als String, z. B. `"2024-01-01"` |
+| `image` | nein | Pfad zu einem WebP-Bild unter `public/images/projects/` |
+| `tags` | nein | Liste von Tags |
+| `github` | nein | Vollständige URL zum Repository |
+| `demo` | nein | Vollständige URL zur Live-Demo |
+| `featured` | nein | Default `true`. Steuert, ob das Projekt im „Selected Works“-Grid der Startseite erscheint. Die Detailseite wird immer erzeugt. |
+| `flagship` | nein | Default `false`. Zeigt das FLAGSHIP-Badge auf der Karte. |
+
 ## Bilder in WebP umwandeln (macOS)
 
-Projektbilder sollten im WebP-Format gespeichert werden, da es deutlich kleinere Dateigrößen bei vergleichbarer Qualität bietet.
+Projektbilder werden ausschließlich im WebP-Format unter `public/images/projects/` gespeichert (keine PNG-/JPG-Duplikate committen), da es deutlich kleinere Dateigrößen bei vergleichbarer Qualität bietet.
 
 ### cwebp installieren
 
