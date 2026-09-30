@@ -28,7 +28,8 @@ const {
   lang = 'en',
 } = Astro.props;
 const ogLocales: Record<string, string> = { en: 'en_US', de: 'de_DE' };
-const ogLocale = ogLocales[lang] ?? ogLocales.en;
+// Look up on the normalized base subtag so regional tags (de-DE, DE) map to their locale
+const ogLocale = ogLocales[lang.split('-')[0].toLowerCase()] ?? ogLocales.en;
 const canonicalURL = new URL(Astro.url.pathname, Astro.site || 'https://pkrason.de');
 
 // JSON-LD Schema
