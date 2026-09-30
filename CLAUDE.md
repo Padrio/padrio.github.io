@@ -39,7 +39,7 @@ Es gibt **keine Tests und keinen Linter**. `npm run build` ist das einzige autom
 ## Struktur
 
 ```
-astro.config.mjs              site, Integrationen (tailwind, icon, sitemap), 301-Redirects, Shiki-Config
+astro.config.mjs              site, Integrationen (tailwind, icon, sitemap), Redirects (Meta-Refresh, s. Regel 10), Shiki-Config
 tailwind.config.mjs           Tailwind-Theme (u. a. max-w-content)
 .cursorrules                  Design-System „Warm Minimalist" im Detail (Quelle für Regel 4)
 .github/workflows/deploy.yml  GitHub-Pages-Deploy (Push auf main + workflow_dispatch)
@@ -83,7 +83,7 @@ Die Detailseite wird für **jedes** Projekt erzeugt, unabhängig von `featured`.
 7. **Rechtliches:** `src/pages/legal.astro` und `src/pages/privacy.astro` nur mit ausdrücklicher Board-Freigabe ändern. Neue Third-Party-Skripte, Tracker, externe CDN-Fonts oder Embeds brauchen eine Board-Freigabe **und** eine passende Anpassung der Datenschutzerklärung (DSGVO).
 8. **Keine neuen Dependencies und keine Major-Upgrades** ohne Board-Freigabe.
 9. **Cross-Pfad-Konsistenz:** wo dieselben Daten an mehreren Stellen gerendert werden (ProjectCard auf der Startseite vs. Detailseite, Frontmatter vs. JSON-LD vs. OG-Tags), alle Pfade Feld für Feld vergleichen. Jede Abweichung muss begründet sein.
-10. **Bestehende URLs und Redirects nicht brechen** — insbesondere die beiden 301-Redirects in `astro.config.mjs`: `/projects/vendbridge-panel` → `/projects/konteo-panel` und `/projects/vendprovision` → `/projects/konteo-provision`.
+10. **Bestehende URLs und Redirects nicht brechen** — insbesondere die beiden Redirects in `astro.config.mjs`: `/projects/vendbridge-panel` → `/projects/konteo-panel` und `/projects/vendprovision` → `/projects/konteo-provision`. Beide sind dort als `status: 301` deklariert, im statischen Build erzeugt Astro daraus aber eine **Meta-Refresh-Seite** (`<meta http-equiv="refresh" content="0;url=…">` plus `<link rel="canonical">` und `robots: noindex`) — GitHub Pages liefert nur statische Dateien aus und kann für eine eigene Redirect-Regel deshalb keinen HTTP-301 setzen; der einzige echte 301 dort ist die automatische Trailing-Slash-Normalisierung. Ein `200` auf der alten URL **mit** Trailing Slash ist deshalb korrekt und kein Defekt: geprüft wird der Seiteninhalt (`curl -sL https://pkrason.de/projects/vendbridge-panel/ | grep http-equiv`), nicht der Statuscode — `curl -I` beantwortet hier nicht die Frage, die man stellt.
 11. **Keine Secrets ins Repo** (`.env` ist gitignored).
 12. **Bei Unklarheit nicht raten:** Frage als Kommentar in das zugehörige Issue, Status `blocked`, Chief of Staff @-erwähnen.
 13. **Keine Fakten erfinden** — keine Projektdetails, Kunden, Zahlen, Zeiträume oder Rollen. Fehlende Fakten beim Board erfragen.
@@ -156,6 +156,6 @@ Welche Reviews nötig sind, entscheidet Chief of Staff beim Zuweisen und schreib
 4. PR über `create-pull-request` öffnen, Link ins Issue.
 5. Review anfordern: für **jeden im Issue genannten Auditor** ein eigenes Review-Child-Issue anlegen und das eigene Issue per `blockedByIssueIds` an diese Child-Issues hängen. Das Review-Issue muss selbsterklärend sein — Ziel, Definition of Done, Branch und PR-Link, relevante Regeln, und was ausdrücklich nicht in Scope ist. Der Auditor kann das Elternissue möglicherweise nicht lesen. **Das Issue bleibt bei dir**; weise es keinem Auditor zu.
 6. Findings abarbeiten. Ändert ein Fix den Diff wesentlich, eine neue Review-Runde als neue Child-Issues aufsetzen — keine geschlossenen Reviews wiederbeleben.
-7. Sind alle Reviews `done` und die Findings behandelt: Issue auf `in_review` mit Verweis auf PR und Review-Verdikte. Der PR liegt jetzt beim Board. **Nicht selbst mergen.**
+7. Sind alle Reviews `done` und die Findings behandelt: Issue auf `in_review` mit Verweis auf PR und Review-Verdikte. **`in_review` allein genügt nicht** — ohne realen Review-Pfad lehnt die Plattform den Statuswechsel mit `invalid_issue_disposition` ab; Zuweisung an einen Agent plus „bitte reviewen" ist kein solcher Pfad. Lege deshalb vorher eine `request_confirmation`-Interaction auf dem Issue an (`resolverPolicy: human_only`, weil der Merge nach Regel 1 eine Board-Entscheidung ist; `continuationPolicy: wake_assignee`) und binde sie im Statuswechsel per `reviewInteractionId` an das Review: damit ist der Reviewer ein Mensch, die Merge-Entscheidung erscheint dem Board als Karte, und du wachst nach der Entscheidung automatisch auf. Der PR liegt jetzt beim Board. **Nicht selbst mergen.**
 8. Nach dem Merge Deploy-Check: `git fetch origin main && git log --oneline origin/main -3`, dann https://pkrason.de prüfen. Danach das Issue auf `done`.
 9. Blocker: Frage als Kommentar, Status `blocked`, Chief of Staff @-erwähnen (Regel 12).
