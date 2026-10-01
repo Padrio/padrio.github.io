@@ -17,8 +17,8 @@ Diese Datei wird automatisch gelesen und ist die maßgebliche Quelle für Projek
 | Deploy | `.github/workflows/deploy.yml` — läuft bei **jedem** Push auf `main` |
 | PR-Gate | `.github/workflows/pr-build.yml` — Job-Key und Status-Kontext `pr-build`, läuft bei jedem Pull Request gegen `main` |
 | Merge-Gate `main` | Repository Ruleset `main: pr-build required` (id `24245581`) auf dem Default-Branch, `enforcement: active`, `bypass_actors: []`. Keine klassische Branch Protection — im UI unter *Settings → Rules*. Details und Konsequenz in **Runtime-Realität**. |
-| Framework | Astro 4.16, rein statisch (kein SSR, kein Adapter) |
-| Versionen | Alle Versionen hier sind der Ist-Stand aus `package-lock.json`; maßgeblich ist der Lockfile, `npm ci` installiert deterministisch daraus. `package.json` führt weitere Ranges (z. B. `astro: ^4.0.0`). |
+| Framework | Astro 5.18, rein statisch (kein SSR, kein Adapter) |
+| Versionen | Alle Versionen hier sind der Ist-Stand aus `package-lock.json`; maßgeblich ist der Lockfile, `npm ci` installiert deterministisch daraus. `package.json` führt weitere Ranges (z. B. `astro: ^5.18.2`). |
 | Styling | Tailwind CSS 3.4 via `@astrojs/tailwind`, plus `@tailwindcss/typography` |
 | Icons | `astro-icon` 1.1 mit `@iconify-json/simple-icons` |
 | SEO | `@astrojs/sitemap` |
@@ -51,7 +51,7 @@ public/favicon.svg
 public/images/profile.jpg     Default-OG-Bild
 public/images/projects/*.webp Projekt-Screenshots — ausschließlich WebP
 
-src/content/config.ts         Schema der Content Collection "projects" (Zod)
+src/content.config.ts         Schema der Content Collection "projects" (Zod, Content Layer API)
 src/content/projects/*.md     Ein Markdown-File pro Projekt, Frontmatter nach obigem Schema
 src/layouts/Layout.astro      HTML-Grundgerüst: Meta-/OG-/Twitter-Tags, Person-JSON-LD,
                               Fonts, Clarity-Init, Skip-Link, Navigation, Footer, reveal.js
@@ -65,7 +65,7 @@ src/scripts/reveal.js         Staggered Scroll-Reveal (respektiert prefers-reduc
 src/styles/global.css         Tailwind-Layer, Basis-Styles, Skip-Link, Reveal-Styles
 ```
 
-### Content-Collection-Schema (`src/content/config.ts`)
+### Content-Collection-Schema (`src/content.config.ts`)
 
 `title`, `description`, `date` (Strings, Pflicht) · `image`, `tags[]`, `github` (URL), `demo` (URL) optional ·
 `featured` (Default `true`, steuert die Anzeige im "Selected Works"-Grid) ·
