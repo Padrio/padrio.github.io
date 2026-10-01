@@ -1,6 +1,5 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@config "../../tailwind.config.mjs";
 
 @layer base {
   html {
@@ -22,7 +21,7 @@
 
   a:focus-visible,
   button:focus-visible {
-    outline: 2px solid theme('colors.orange.600');
+    outline: 2px solid var(--color-orange-600);
     outline-offset: 3px;
     border-radius: 8px;
   }
