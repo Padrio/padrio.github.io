@@ -1,6 +1,6 @@
 ---
 import Layout from '../../layouts/Layout.astro';
-import { getCollection, type CollectionEntry } from 'astro:content';
+import { getCollection, render, type CollectionEntry } from 'astro:content';
 
 export async function getStaticPaths() {
   const projects: CollectionEntry<'projects'>[] = await getCollection('projects');
@@ -9,7 +9,7 @@ export async function getStaticPaths() {
   );
 
   return sortedProjects.map((project, index) => ({
-    params: { slug: project.slug },
+    params: { slug: project.id },
     props: {
       project,
       prevProject: sortedProjects[index + 1] || null,
@@ -25,7 +25,7 @@ interface Props {
 }
 
 const { project, prevProject, nextProject } = Astro.props;
-const { Content, headings } = await project.render();
+const { Content, headings } = await render(project);
 
 // Calculate reading time (~200 words per minute)
 const content = await project.body;
@@ -42,7 +42,7 @@ const projectJsonLd = {
   "name": project.data.title,
   "description": project.data.description,
   ...(project.data.image && { "image": `https://pkrason.de${project.data.image}` }),
-  "url": `https://pkrason.de/projects/${project.slug}`,
+  "url": `https://pkrason.de/projects/${project.id}`,
   "datePublished": project.data.date,
   "author": {
     "@type": "Person",
@@ -199,7 +199,7 @@ const projectJsonLd = {
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
           {prevProject && (
             <a
-              href={`/projects/${prevProject.slug}`}
+              href={`/projects/${prevProject.id}`}
               data-reveal
               class="block bg-white border border-stone-200 rounded-[14px] px-[26px] py-[22px] transition-[transform,border-color,box-shadow] duration-200 hover:border-stone-300 motion-safe:hover:-translate-y-[3px] hover:shadow-[0_14px_28px_-18px_rgba(28,25,23,0.25)]"
             >
@@ -209,7 +209,7 @@ const projectJsonLd = {
           )}
           {nextProject && (
             <a
-              href={`/projects/${nextProject.slug}`}
+              href={`/projects/${nextProject.id}`}
               data-reveal
               class={`block bg-white border border-stone-200 rounded-[14px] px-[26px] py-[22px] text-right transition-[transform,border-color,box-shadow] duration-200 hover:border-stone-300 motion-safe:hover:-translate-y-[3px] hover:shadow-[0_14px_28px_-18px_rgba(28,25,23,0.25)] ${!prevProject ? 'sm:col-start-2' : ''}`}
             >

@@ -12,7 +12,7 @@ const featuredProjects = projects
     title: p.data.title,
     description: p.data.description,
     tags: p.data.tags || [],
-    href: `/projects/${p.slug}`,
+    href: `/projects/${p.id}`,
     image: p.data.image,
     flagship: p.data.flagship,
   }));
