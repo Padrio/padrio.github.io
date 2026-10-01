@@ -70,16 +70,19 @@ const projectJsonLd = {
   <article>
     <!-- Header -->
     <div class="max-w-content mx-auto px-4 sm:px-7 pt-8 sm:pt-11">
-      <a
-        href="/#works"
-        data-reveal
-        class="inline-flex items-center gap-[7px] text-[14.5px] font-medium text-stone-500 hover:text-orange-600 transition-colors mb-7 py-2 min-h-[44px]"
-      >
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M15 18l-6-6 6-6"/>
-        </svg>
-        Back to Projects
-      </a>
+      <!-- data-reveal lives on the wrapper, not the <a>: the unlayered reveal rule's
+           `transition` shorthand would otherwise override transition-colors. -->
+      <div data-reveal>
+        <a
+          href="/#works"
+          class="inline-flex items-center gap-[7px] text-[14.5px] font-medium text-stone-500 hover:text-orange-600 transition-colors mb-7 py-2 min-h-[44px]"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M15 18l-6-6 6-6"/>
+          </svg>
+          Back to Projects
+        </a>
+      </div>
 
       <h1 data-reveal class="font-extrabold text-[clamp(2.25rem,7vw,3.25rem)] leading-[1.05] tracking-[-0.035em] text-stone-900 mb-[22px] max-w-[16ch]">
         {project.data.title}
