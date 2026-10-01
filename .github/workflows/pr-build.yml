@@ -57,7 +57,10 @@ jobs:
           # Die ANSI-C-Quotung $'*\n*' ist nötig; "*$(printf '\n')*" funktioniert NICHT —
           # die Kommandosubstitution frisst den Zeilenumbruch, das Muster kollabiert zu
           # "**" und träfe jede Datei.
-          odd_paths=$(find src \( -name '*:*' -o -name $'*\n*' \)) && find_rc=0 || find_rc=$?
+          # -printf '[%p]' statt des nackten Pfads: im Zeilenumbruch-Fall ist die
+          # Meldung selbst zweizeilig, und ohne Klammern ist nicht ansehbar, ob ein
+          # Pfad oder zwei gefunden wurden (PRI-96 Finding 4).
+          odd_paths=$(find src \( -name '*:*' -o -name $'*\n*' \) -printf '  [%p]\n') && find_rc=0 || find_rc=$?
           if [ "$find_rc" -ne 0 ]; then
             echo "find brach unter src/ mit Status ${find_rc} ab (Details auf stderr). Das Gate"
             echo "kann nicht bestätigen, dass src/ vollständig lesbar ist, und lehnt deshalb ab."
@@ -65,7 +68,8 @@ jobs:
           fi
           if [ -n "$odd_paths" ]; then
             echo "Pfade mit \":\" oder Zeilenumbruch unter src/ gefunden — das Gate kann"
-            echo "\"datei:zeile\" nicht eindeutig melden und lehnt deshalb ab:"
+            echo "\"datei:zeile\" nicht eindeutig melden und lehnt deshalb ab (ein Eintrag je"
+            echo "Klammerpaar):"
             printf '%s\n' "$odd_paths"
             exit 1
           fi
@@ -88,6 +92,7 @@ jobs:
 
           findings=""
           checked=0
+          checked_labels=""
 
           # $1 = Muster, wie es im Log erscheint · $2 = ERE · $3 = die richtige Ersetzung
           # $4 = optional: eine Datei, die für genau dieses Muster übersprungen wird
@@ -102,6 +107,7 @@ jobs:
           scan() {
             local label="$1" re="$2" fix="$3" skip="${4:-}" out rc rec file lineno
             checked=$((checked + 1))
+            checked_labels="${checked_labels}${label}"$'\n'
             out=$(grep -rnaE -- "$re" src/) && rc=0 || rc=$?
             if [ "$rc" -gt 1 ]; then
               echo "grep brach beim Muster \"${label}\" mit Status ${rc} ab. Das Gate kann nicht"
@@ -232,11 +238,47 @@ jobs:
           # eine plausible Erfolgsmeldung über einem nicht erfolgten Scan (PRI-92 F-A).
           # Eine Listenänderung zieht expected_patterns mit; ein vergessener Bump ist
           # rot, nicht still grün.
+          #
+          # Der Vergleich darunter ist arithmetisch, und `test` bricht bei einem
+          # Nicht-Integer mit Status 2 ab statt mit 0 oder 1. Die Bedingung eines `if`
+          # ist von errexit ausgenommen, dort gilt Status 2 schlicht als "falsch": ein
+          # beschädigter Wert (leer, "l8", "18x" — der Vertipper, der an einer von Hand
+          # gepflegten Konstante naheliegt) machte diese Prüfung damit still zum No-Op,
+          # und das Gate lief in die Erfolgsmeldung. Also erst den Wert prüfen, dann
+          # vergleichen (PRI-96 Finding 1, PRI-97 F-1). Die ganz gelöschte Zeile ist
+          # dagegen harmlos: set -u tötet die Shell hart.
+          case $expected_patterns in
+            ''|*[!0-9]*)
+              echo "expected_patterns ist keine Zahl (\"${expected_patterns}\") — die Konstante in"
+              echo "dieser Datei ist beschädigt. Das Gate kann nicht prüfen, ob die Musterliste"
+              echo "vollständig ist, und lehnt deshalb ab."
+              exit 1
+              ;;
+          esac
           if [ "$checked" -ne "$expected_patterns" ]; then
             echo "Das Gate hat ${checked} statt ${expected_patterns} Muster geprüft — die Liste"
-            echo "ist unvollständig. Wurde ein Muster absichtlich entfernt oder ergänzt, ist"
-            echo "expected_patterns in dieser Datei mitzuziehen (eine Listenänderung zieht nach"
-            echo "der Review-Matrix in CLAUDE.md den Security & Ops Auditor)."
+            echo "stimmt nicht mit expected_patterns überein. Wurde ein Muster absichtlich"
+            echo "entfernt oder ergänzt, ist expected_patterns in dieser Datei mitzuziehen (eine"
+            echo "Listenänderung zieht nach der Review-Matrix in CLAUDE.md den Security & Ops"
+            echo "Auditor)."
+            exit 1
+          fi
+
+          # Eine Zahl erkennt eine geschrumpfte Liste, keine ersetzte: wird eine Zeile
+          # durch die Kopie einer anderen überschrieben — ein Merge, der denselben Hunk
+          # zweimal anwendet —, bleibt checked bei 18, und das verdrängte Muster ist
+          # ungeprüft. Wieder dieselbe Fehlerklasse (PRI-96 Finding 2), deshalb hier
+          # dieselbe Konsequenz.
+          dupes=$(printf '%s' "$checked_labels" | sort | uniq -d) && dupe_rc=0 || dupe_rc=$?
+          if [ "$dupe_rc" -ne 0 ]; then
+            echo "Die Musterliste konnte nicht auf Doppel geprüft werden (Status ${dupe_rc}),"
+            echo "das Gate lehnt deshalb ab."
+            exit 1
+          fi
+          if [ -n "$dupes" ]; then
+            echo "Doppelte Muster in der Musterliste — ein Muster wurde überschrieben statt"
+            echo "ergänzt, und das verdrängte ist damit ungeprüft:"
+            printf '%s\n' "$dupes"
             exit 1
           fi
 
