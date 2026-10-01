@@ -336,7 +336,12 @@ const projectJsonLd = {
     padding: 1px 6px;
     border-radius: 5px;
     color: var(--color-stone-700);
-    white-space: nowrap;
+    /* Not `white-space: nowrap`: an inline code span wider than the content
+       column cannot wrap and pushes the whole document sideways (a 68-char span
+       measured 558px against a 358px column at 390px viewport). `break-word`
+       only splits a word that would not fit on a line of its own, so short
+       identifiers are still never broken mid-token. */
+    overflow-wrap: break-word;
   }
 
   .prose-project pre {
