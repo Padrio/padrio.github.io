@@ -8,9 +8,16 @@ const anchor = (hash: string) => (isHome ? hash : `/${hash}`);
   id="site-nav"
   class="sticky top-0 z-50 border-b border-stone-200/80 bg-stone-50/80 backdrop-blur-md backdrop-saturate-150 transition-shadow duration-300"
 >
-  <!-- The unprefixed type and padding steps below `sm` keep the whole row inside
-       288px (a 320px viewport minus px-4); the `sm:` values are the design size
-       and are unchanged. Heights are deliberately untouched — min-h and py stay. -->
+  {/* The unprefixed type and padding steps below `sm` keep the whole row inside
+      288px (a 320px viewport minus px-4); the `sm:` values are the design size
+      and are unchanged. Heights are deliberately untouched — min-h and py stay.
+
+      It fits, but only just: at 320px the row occupies 284.45px of those 288px
+      (logo 93.45 + link group 191), so there are 3.55px to spare. A fourth nav
+      link, a longer label or a wider font will overflow 320px again — that is a
+      layout change, not a tweak. A webfont failure is the safe direction:
+      without Inter the row measures 255.39px, so Inter is the widest case and
+      therefore the one these numbers were measured against. */}
   <div class="max-w-content mx-auto px-4 sm:px-7 py-2 sm:py-2.5 flex items-center justify-between">
     <a
       href="/"

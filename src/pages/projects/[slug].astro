@@ -338,9 +338,25 @@ const projectJsonLd = {
     color: var(--color-stone-700);
     /* Not `white-space: nowrap`: an inline code span wider than the content
        column cannot wrap and pushes the whole document sideways (a 68-char span
-       measured 558px against a 358px column at 390px viewport). `break-word`
-       only splits a word that would not fit on a line of its own, so short
-       identifiers are still never broken mid-token. */
+       measured 558px against a 358px column at a 390px viewport).
+
+       Two separate things do the work here, and they are easy to confuse.
+       Dropping `nowrap` restores every *normal* break opportunity inside a span
+       — space, hyphen, slash — so a short identifier may now split at its
+       hyphen on a narrow screen even though it would have fit on a line of its
+       own (`oapi-codegen` splits at 360px, `spatie/laravel-permission` at
+       375px). That is the cost of this rule, not an accident.
+       `overflow-wrap: break-word` then covers the spans that have *no* break
+       opportunity at all, and it is load-bearing, not decoration: with `nowrap`
+       gone but `overflow-wrap: normal`, a 320px viewport still measures
+       scrollWidth 382, because `METHOD\nPATH\nSHA256(BODY)\nTIMESTAMP\nNONCE`
+       is one unbreakable 44-char token.
+
+       `break-word` rather than `anywhere` because it leaves the min-content
+       width alone. The two are indistinguishable today — the only min-content
+       sensitive ancestor is the `lg:grid-cols-[minmax(0,1fr)_280px]` track
+       above, whose minimum is already capped at 0 — so this is the
+       conservative choice, not a measured difference. */
     overflow-wrap: break-word;
   }
 
