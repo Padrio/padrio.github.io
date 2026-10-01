@@ -109,6 +109,14 @@ jobs:
           # GNU grep meldet "binary file matches" auf stderr und erzeugt keinen Fund.
           scan() {
             local label="$1" re="$2" fix="$3" skip="${4:-}" out rc rec file lineno
+            # Hier wird arithmetisch verglichen, und das ist die einzige Stelle, an der
+            # das noch zulässig ist: "$#" ist ein von der Shell erzeugter Spezialparameter,
+            # immer eine nichtnegative Dezimalzahl und nach oben durch ARG_MAX begrenzt.
+            # "test ... -gt" kann hier also nicht mit Status 2 abbrechen, und ein Status 2
+            # wäre in einer if-Bedingung stillschweigend "falsch" (errexit greift dort
+            # nicht). Bei expected_patterns weiter unten ist das anders — das ist eine von
+            # Hand gepflegte Konstante, deshalb steht dort "!=" statt "-ne"; Begründung
+            # dort bei der Zahlenprüfung.
             if [ "$#" -gt 4 ]; then
               echo "scan(): $# Argumente für das Muster \"${label}\" — gebunden werden nur vier."
               echo "Ein zweites Skip-Argument hat keine Wirkung; dafür müsste scan() erweitert"
@@ -216,8 +224,15 @@ jobs:
           # ganzes Verzeichnis verbreitern.
           # Achtung (PRI-99 F-3): eine ZWEITE Skip-Datei geht nicht nebenbei. scan()
           # bindet genau ein Skip ("${4:-}"); ein fünftes Argument lehnt scan() jetzt
-          # laut ab, und die token-Zeile zu duplizieren scheitert am Doppel-Check weiter
-          # unten. Zwei Skip-Dateien brauchen also zuerst eine Erweiterung von scan()
+          # laut ab, und die token-Zeile zu duplizieren hilft auch nicht: jede Kopie
+          # bindet nur ihr eigenes Skip, also meldet jede Kopie genau den Fund, den die
+          # andere überspringt — rot, aber mit der Fundstellen-Meldung und ohne jeden
+          # Hinweis darauf, dass das Konstrukt nicht funktioniert hat. Eine VERBATIM
+          # duplizierte Zeile ist ebenfalls rot, aber über einen anderen Guard: solange
+          # irgendeine ungeskippte Prosa-Stelle offen ist, über die Fundstellen-Meldung,
+          # sonst über die Zahlenprüfung (expected_patterns nicht mitgezogen) bzw. den
+          # Doppel-Check (mitgezogen). Alle sechs Varianten gemessen, PRI-80 Runde 6.
+          # Zwei Skip-Dateien brauchen also zuerst eine Erweiterung von scan()
           # auf eine Liste — das ist eine Änderung an der Gate-Mechanik und zieht nach
           # der Review-Matrix den Security & Ops Auditor.
           # Ein solcher Workflow-PR kommt an seinem eigenen Gate vorbei, solange die
