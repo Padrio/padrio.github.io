@@ -1,5 +1,5 @@
 import { defineConfig } from 'astro/config';
-import tailwind from '@astrojs/tailwind';
+import tailwindcss from '@tailwindcss/vite';
 import icon from 'astro-icon';
 import sitemap from '@astrojs/sitemap';
 
@@ -7,10 +7,13 @@ import sitemap from '@astrojs/sitemap';
 export default defineConfig({
   site: 'https://pkrason.de',
   integrations: [
-    tailwind(),
     icon(),
     sitemap()
   ],
+  // Tailwind 4 kommt als Vite-Plugin; die Integration @astrojs/tailwind ist aufgegeben
+  vite: {
+    plugins: [tailwindcss()]
+  },
   redirects: {
     '/projects/vendbridge-panel': {
       status: 301,

@@ -27,9 +27,9 @@ jobs:
       
       - name: Install, build, and upload your site
         # Die offizielle Astro Action erkennt automatisch deinen Paketmanager (npm, pnpm, yarn)
-        uses: withastro/action@v2
+        uses: withastro/action@v6.1.3
         with:
-          node-version: 20
+          node-version: 22
           package-manager: npm@latest
 
   deploy:
