@@ -42,29 +42,104 @@ jobs:
 
           test -d src || { echo "src/ nicht gefunden — läuft dieser Schritt im Repo-Root?"; exit 1; }
 
+          # Ein ":" im Dateinamen macht die Meldung "datei:zeile" mehrdeutig und würde
+          # den Dateivergleich der Skip-Ausnahme unten falsch zerlegen. Ein Zeilenumbruch
+          # im Dateinamen tut dasselbe von der anderen Seite: er zerlegt einen grep-Record
+          # in zwei und erzeugt aus einem echten Fund zwei Phantom-Fundstellen
+          # ("src/we:src/we" plus "ird.css:1"). Beides ist fail-closed — der Step geht
+          # trotzdem auf exit 1 —, aber die gemeldete Fundstelle schickt den Leser an die
+          # falsche Stelle (PRI-87 Finding 2, PRI-92 F-C). Heute hat kein Pfad im Repo
+          # eines von beidem; käme einer dazu, bricht das Gate lieber ab, als eine
+          # Fundstelle falsch zu melden.
+          # Auch hier gilt: ein Fehler ist kein "nichts gefunden". Ohne diese Abfrage
+          # würde errexit den Step kommentarlos töten (fail-closed, aber ohne Grund
+          # im Log), etwa bei einem unlesbaren Verzeichnis unter src/.
+          # Die ANSI-C-Quotung $'*\n*' ist nötig; "*$(printf '\n')*" funktioniert NICHT —
+          # die Kommandosubstitution frisst den Zeilenumbruch, das Muster kollabiert zu
+          # "**" und träfe jede Datei.
+          # -printf '[%p]' statt des nackten Pfads: im Zeilenumbruch-Fall ist die
+          # Meldung selbst zweizeilig, und ohne Klammern ist nicht ansehbar, ob ein
+          # Pfad oder zwei gefunden wurden (PRI-96 Finding 4).
+          odd_paths=$(find src \( -name '*:*' -o -name $'*\n*' \) -printf '  [%p]\n') && find_rc=0 || find_rc=$?
+          if [ "$find_rc" -ne 0 ]; then
+            echo "find brach unter src/ mit Status ${find_rc} ab (Details auf stderr). Das Gate"
+            echo "kann nicht bestätigen, dass src/ vollständig lesbar ist, und lehnt deshalb ab."
+            exit 1
+          fi
+          if [ -n "$odd_paths" ]; then
+            echo "Pfade mit \":\" oder Zeilenumbruch unter src/ gefunden — das Gate kann"
+            echo "\"datei:zeile\" nicht eindeutig melden und lehnt deshalb ab (ein Eintrag je"
+            echo "Klammerpaar):"
+            printf '%s\n' "$odd_paths"
+            exit 1
+          fi
+
           # Token-Grenzen nach der in PRI-80 festgelegten Matching-Semantik:
           # links Zeilenanfang, Whitespace, Anführungszeichen, Backtick oder ":"
           # (damit "hover:shadow-sm", "md:shadow-sm", "group-hover:shadow-sm" treffen),
-          # rechts Zeilenende, Whitespace, Anführungszeichen oder Backtick.
+          # rechts Zeilenende, Whitespace, Anführungszeichen, Backtick oder ";".
           # Folgt daraus und ist so gewollt: "drop-shadow-sm" löst das Muster
           # "shadow-sm" NICHT aus — links davon steht ein "-", keine Tokengrenze.
           # Es hat seinen eigenen Eintrag in der Liste.
+          #
+          # Das ";" rechts ist mit PRI-80 nachgetragen (Finding beider Auditoren auf
+          # PRI-87/PRI-88): hinter der letzten Klasse einer @apply-Deklaration steht
+          # immer ein ";", und ohne diese Grenze war genau sie ungeprüft — in allen
+          # 19 @apply-Zeilen in src/ (legal.astro, privacy.astro, global.css).
+          # "@apply rounded-lg shadow-sm;" baute damit still grün durch.
           LB="(^|[[:space:]\"\`':])"
-          RB="([[:space:]\"\`']|\$)"
+          RB="([[:space:]\"\`';]|\$)"
 
           findings=""
           checked=0
+          checked_labels=""
 
           # $1 = Muster, wie es im Log erscheint · $2 = ERE · $3 = die richtige Ersetzung
-          # $4 = optional: eine Datei, die für genau dieses Muster übersprungen wird
+          # $4 = optional: GENAU EINE Datei, die für dieses Muster übersprungen wird.
+          # Mehr als vier Argumente sind ein Fehlaufruf und werden laut abgelehnt, statt
+          # still verworfen zu werden (PRI-99 F-3/F-4): "${4:-}" bindet ein Skip, ein
+          # fünftes Argument hätte sonst keine Wirkung und niemand würde es merken.
+          #
+          # Ein fehlgeschlagener Scan darf nicht als "nichts gefunden" durchgehen — das
+          # wäre genau das stille Grün, gegen das dieses Gate gebaut ist. grep liefert
+          # 0 = Treffer, 1 = kein Treffer, >= 2 = Fehler; ab 2 bricht der Step hart ab.
+          # Der Status wird dafür in dieser Shell ausgewertet und nicht in einer
+          # Prozess-Substitution verworfen, deren Ergebnis die Shell nie ansieht.
+          # "-a" behandelt Binärdateien als Text, statt sie still zu überspringen:
+          # GNU grep meldet "binary file matches" auf stderr und erzeugt keinen Fund.
           scan() {
-            local label="$1" re="$2" fix="$3" skip="${4:-}" loc
+            local label="$1" re="$2" fix="$3" skip="${4:-}" out rc rec file lineno
+            # Hier wird arithmetisch verglichen, und das ist die einzige Stelle, an der
+            # das noch zulässig ist: "$#" ist ein von der Shell erzeugter Spezialparameter,
+            # immer eine nichtnegative Dezimalzahl und nach oben durch ARG_MAX begrenzt.
+            # "test ... -gt" kann hier also nicht mit Status 2 abbrechen, und ein Status 2
+            # wäre in einer if-Bedingung stillschweigend "falsch" (errexit greift dort
+            # nicht). Bei expected_patterns weiter unten ist das anders — das ist eine von
+            # Hand gepflegte Konstante, deshalb steht dort "!=" statt "-ne"; Begründung
+            # dort bei der Zahlenprüfung.
+            if [ "$#" -gt 4 ]; then
+              echo "scan(): $# Argumente für das Muster \"${label}\" — gebunden werden nur vier."
+              echo "Ein zweites Skip-Argument hat keine Wirkung; dafür müsste scan() erweitert"
+              echo "werden. Das Gate lehnt ab, statt den Aufruf still halb auszuführen."
+              exit 1
+            fi
             checked=$((checked + 1))
-            while IFS= read -r loc; do
-              [ -n "$loc" ] || continue
-              if [ -n "$skip" ] && [ "${loc%%:*}" = "$skip" ]; then continue; fi
-              findings="${findings}  ${loc}  ${label}  ->  ${fix}"$'\n'
-            done < <(grep -rnE -- "$re" src/ | cut -d: -f1,2)
+            checked_labels="${checked_labels}${label}"$'\n'
+            out=$(grep -rnaE -- "$re" src/) && rc=0 || rc=$?
+            if [ "$rc" -gt 1 ]; then
+              echo "grep brach beim Muster \"${label}\" mit Status ${rc} ab. Das Gate kann nicht"
+              echo "bestätigen, dass src/ geprüft wurde, und lehnt deshalb ab."
+              exit 1
+            fi
+            [ -n "$out" ] || return 0
+            while IFS= read -r rec; do
+              [ -n "$rec" ] || continue
+              file=${rec%%:*}
+              lineno=${rec#*:}
+              lineno=${lineno%%:*}
+              if [ -n "$skip" ] && [ "$file" = "$skip" ]; then continue; fi
+              findings="${findings}  ${file}:${lineno}  ${label}  ->  ${fix}"$'\n'
+            done <<< "$out"
           }
 
           # ganzes Klassen-Token bzw. Präfix; ein optionales $3 wird als Skip durchgereicht
@@ -112,7 +187,11 @@ jobs:
           token  "blur-sm"               "blur-xs"
           token  "drop-shadow-sm"        "drop-shadow-xs"
 
-          # literale Zeichenkette, kein Klassen-Token — "(" in der ERE maskiert
+          # literale Zeichenkette, kein Klassen-Token — "(" in der ERE maskiert.
+          # Bewusst für JEDES theme(), nicht nur für theme('fontFamily.…'): eine
+          # Farbabfrage wie theme('colors.orange.600') löst unter @config zwar auf,
+          # aber die Unterscheidung gehört nicht in eine Mustersuche. Wer hier
+          # hereinläuft, schreibt die CSS-Variable hin — kein Fehlalarm.
           scan   "theme("                "theme\("                 "CSS-Variable direkt, z. B. var(--color-…)"
 
           prefix "bg-opacity-"           "Slash-Syntax, z. B. bg-stone-900/50"
@@ -136,8 +215,38 @@ jobs:
           # @apply-Liste in genau dieser Datei würde das Gate nicht mehr sehen — die drei
           # @apply-Zeilen dort (:21, :47, :51) enthalten heute keins. Alle anderen Muster
           # prüfen global.css weiterhin vollständig.
+          #
+          # Notausgang, falls `ring` erneut auf Prosa anschlägt — damit rechnen, etwa in
+          # einer englischen Projektbeschreibung unter src/content/projects/: PRI-80
+          # erlaubt die Scope-Einschränkung ausdrücklich, aber nur mit einem Kommentar
+          # hier, der den konkreten Fund nennt. Der kürzeste Weg ist, die Prosa
+          # umzuformulieren — NICHT das Muster entfernen und nicht den Skip auf ein
+          # ganzes Verzeichnis verbreitern.
+          # Achtung (PRI-99 F-3): eine ZWEITE Skip-Datei geht nicht nebenbei. scan()
+          # bindet genau ein Skip ("${4:-}"); ein fünftes Argument lehnt scan() jetzt
+          # laut ab, und die token-Zeile zu duplizieren hilft auch nicht: jede Kopie
+          # bindet nur ihr eigenes Skip, also meldet jede Kopie genau den Fund, den die
+          # andere überspringt — rot, aber mit der Fundstellen-Meldung und ohne jeden
+          # Hinweis darauf, dass das Konstrukt nicht funktioniert hat. Eine VERBATIM
+          # duplizierte Zeile ist ebenfalls rot, aber über einen anderen Guard: solange
+          # irgendeine ungeskippte Prosa-Stelle offen ist, über die Fundstellen-Meldung,
+          # sonst über die Zahlenprüfung (expected_patterns nicht mitgezogen) bzw. den
+          # Doppel-Check (mitgezogen). Alle sechs Varianten gemessen, PRI-80 Runde 6.
+          # Zwei Skip-Dateien brauchen also zuerst eine Erweiterung von scan()
+          # auf eine Liste — das ist eine Änderung an der Gate-Mechanik und zieht nach
+          # der Review-Matrix den Security & Ops Auditor.
+          # Ein solcher Workflow-PR kommt an seinem eigenen Gate vorbei, solange die
+          # auslösende Prosa nicht in seinem Branch liegt; das Gate kann sich also
+          # nicht selbst aussperren.
           token  "ring"                  "ring-3 für die alte Optik, oder bewusst ring-1"  "src/styles/global.css"
           token  "outline-none"          "outline-hidden"
+
+          # Soll-Zahl der Muster, bewusst direkt unter der Liste und nicht oben bei
+          # checked=0: wer eine Zeile aus der Liste entfernt, sieht die Konstante im
+          # selben Diff-Hunk. Geprüft wird sie weiter unten, auf dem grünen Pfad —
+          # ein echter Fund soll zuerst im Log stehen und nicht von dieser Meldung
+          # verdeckt werden.
+          expected_patterns=18
 
           if [ -n "$findings" ]; then
             echo "Tailwind-3-Idiome in src/ gefunden — dieser PR wird abgelehnt."
@@ -148,6 +257,69 @@ jobs:
             echo "Warum dieses Gate existiert und warum einzelne Kandidaten bewusst nicht auf der"
             echo "Liste stehen: Issue PRI-80, Begründung auch als Kommentar in dieser Datei direkt"
             echo "über der Liste (.github/workflows/pr-build.yml)."
+            exit 1
+          fi
+
+          # Ohne diese Abfrage wird $checked gemeldet, aber nie geprüft — fällt eine
+          # token/prefix/scan-Zeile aus der Liste weg (Tippfehler, verunglückter Merge,
+          # Rebase-Konflikt in diesem Block), meldete das Gate zufrieden "17 Muster
+          # geprüft" und ginge grün. Niemand liest 17 gegen 18, solange nichts danach
+          # fragt. Das ist dieselbe Fehlerklasse, gegen die dieses Gate gebaut ist:
+          # eine plausible Erfolgsmeldung über einem nicht erfolgten Scan (PRI-92 F-A).
+          # Eine Listenänderung zieht expected_patterns mit; ein vergessener Bump ist
+          # rot, nicht still grün.
+          #
+          # Ein ARITHMETISCHER Vergleich wäre hier selbst ein stilles No-Op: `test`
+          # bricht bei einem Nicht-Integer mit Status 2 ab statt mit 0 oder 1, die
+          # Bedingung eines `if` ist von errexit ausgenommen, und dort gilt Status 2
+          # schlicht als "falsch" — die Prüfung entfiel, das Gate lief in die
+          # Erfolgsmeldung (PRI-96 Finding 1, PRI-97 F-1). Deshalb zwei Dinge:
+          #   1. der case-Guard prüft den Wert, bevor er verglichen wird. Er fängt die
+          #      realistischen Verunglückungen an einer von Hand gepflegten Konstante
+          #      (leer, "l8", "18x"); die ganz gelöschte Zeile ist ohnehin harmlos,
+          #      set -u tötet die Shell hart.
+          #   2. der Vergleich selbst ist ein STRING-Vergleich ("!=", nicht "-ne").
+          #      Ein case-Guard auf die Zeichenklasse allein reichte nicht: `test -ne`
+          #      bricht auch bei einer reinen Ziffernfolge über INTMAX_MAX mit Status 2
+          #      ab, und 9223372036854775808 passiert ''|*[!0-9]* (PRI-99 F-1,
+          #      PRI-100 S-1). "!=" kann nicht mit Status 2 abbrechen und schließt die
+          #      Klasse damit ganz, statt nur ihre wahrscheinlichen Fälle.
+          # Beide Operanden sind an dieser Stelle reine Dezimalziffernfolgen — $checked
+          # kommt aus $((checked + 1)) —, der String-Vergleich ist hier also gleich
+          # bedeutend. Nebeneffekt, gewollt: eine führende Null ("018") ist jetzt rot.
+          # Eine beschädigte Konstante soll ablehnen.
+          case $expected_patterns in
+            ''|*[!0-9]*)
+              echo "expected_patterns ist keine Zahl (\"${expected_patterns}\") — die Konstante in"
+              echo "dieser Datei ist beschädigt. Das Gate kann nicht prüfen, ob die Musterliste"
+              echo "vollständig ist, und lehnt deshalb ab."
+              exit 1
+              ;;
+          esac
+          if [ "$checked" != "$expected_patterns" ]; then
+            echo "Das Gate hat ${checked} statt ${expected_patterns} Muster geprüft — die Liste"
+            echo "stimmt nicht mit expected_patterns überein. Wurde ein Muster absichtlich"
+            echo "entfernt oder ergänzt, ist expected_patterns in dieser Datei mitzuziehen (eine"
+            echo "Listenänderung zieht nach der Review-Matrix in CLAUDE.md den Security & Ops"
+            echo "Auditor)."
+            exit 1
+          fi
+
+          # Eine Zahl erkennt eine geschrumpfte Liste, keine ersetzte: wird eine Zeile
+          # durch die Kopie einer anderen überschrieben — ein Merge, der denselben Hunk
+          # zweimal anwendet —, bleibt checked bei 18, und das verdrängte Muster ist
+          # ungeprüft. Wieder dieselbe Fehlerklasse (PRI-96 Finding 2), deshalb hier
+          # dieselbe Konsequenz.
+          dupes=$(printf '%s' "$checked_labels" | sort | uniq -d) && dupe_rc=0 || dupe_rc=$?
+          if [ "$dupe_rc" -ne 0 ]; then
+            echo "Die Musterliste konnte nicht auf Doppel geprüft werden (Status ${dupe_rc}),"
+            echo "das Gate lehnt deshalb ab."
+            exit 1
+          fi
+          if [ -n "$dupes" ]; then
+            echo "Doppelte Muster in der Musterliste — ein Muster wurde überschrieben statt"
+            echo "ergänzt, und das verdrängte ist damit ungeprüft:"
+            printf '%s\n' "$dupes"
             exit 1
           fi
 
