@@ -203,26 +203,35 @@ const projectJsonLd = {
     {(prevProject || nextProject) && (
       <nav class="max-w-content mx-auto px-4 sm:px-7 mt-16 sm:mt-20" aria-label="Project navigation">
         <div class="h-px bg-stone-200 mb-8 sm:mb-10" aria-hidden="true"></div>
+        <!-- data-reveal sits on the wrappers, not on the anchors: the reveal rule in
+             global.css is unlayered, so its `transition` shorthand beats the anchor's
+             transition-property utility out of @layer utilities no matter the
+             specificity — which left the hover lift jumping instead of gliding. Same
+             convention as Hero.astro and the Selected Works grid on the homepage. The
+             wrappers are `flex` so each anchor still fills the row height the grid
+             stretches the wrapper to, and the grid placement stays on the grid child. -->
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
           {prevProject && (
-            <a
-              href={`/projects/${prevProject.id}`}
-              data-reveal
-              class="block bg-white border border-stone-200 rounded-[14px] px-[26px] py-[22px] transition-[transform,translate,border-color,box-shadow] duration-200 hover:border-stone-300 motion-safe:hover:-translate-y-[3px] hover:shadow-[0_14px_28px_-18px_rgba(28,25,23,0.25)]"
-            >
-              <span class="block font-mono text-[11px] tracking-[0.1em] uppercase text-stone-500 mb-1.5">Previous</span>
-              <span class="block font-bold text-[17px] text-stone-900">{prevProject.data.title}</span>
-            </a>
+            <div data-reveal class="flex">
+              <a
+                href={`/projects/${prevProject.id}`}
+                class="block w-full bg-white border border-stone-200 rounded-[14px] px-[26px] py-[22px] transition-[transform,translate,border-color,box-shadow] duration-200 hover:border-stone-300 motion-safe:hover:-translate-y-[3px] hover:shadow-[0_14px_28px_-18px_rgba(28,25,23,0.25)]"
+              >
+                <span class="block font-mono text-[11px] tracking-[0.1em] uppercase text-stone-500 mb-1.5">Previous</span>
+                <span class="block font-bold text-[17px] text-stone-900">{prevProject.data.title}</span>
+              </a>
+            </div>
           )}
           {nextProject && (
-            <a
-              href={`/projects/${nextProject.id}`}
-              data-reveal
-              class={`block bg-white border border-stone-200 rounded-[14px] px-[26px] py-[22px] text-right transition-[transform,translate,border-color,box-shadow] duration-200 hover:border-stone-300 motion-safe:hover:-translate-y-[3px] hover:shadow-[0_14px_28px_-18px_rgba(28,25,23,0.25)] ${!prevProject ? 'sm:col-start-2' : ''}`}
-            >
-              <span class="block font-mono text-[11px] tracking-[0.1em] uppercase text-stone-500 mb-1.5">Next</span>
-              <span class="block font-bold text-[17px] text-stone-900">{nextProject.data.title}</span>
-            </a>
+            <div data-reveal class={`flex ${!prevProject ? 'sm:col-start-2' : ''}`}>
+              <a
+                href={`/projects/${nextProject.id}`}
+                class="block w-full bg-white border border-stone-200 rounded-[14px] px-[26px] py-[22px] text-right transition-[transform,translate,border-color,box-shadow] duration-200 hover:border-stone-300 motion-safe:hover:-translate-y-[3px] hover:shadow-[0_14px_28px_-18px_rgba(28,25,23,0.25)]"
+              >
+                <span class="block font-mono text-[11px] tracking-[0.1em] uppercase text-stone-500 mb-1.5">Next</span>
+                <span class="block font-bold text-[17px] text-stone-900">{nextProject.data.title}</span>
+              </a>
+            </div>
           )}
         </div>
       </nav>
