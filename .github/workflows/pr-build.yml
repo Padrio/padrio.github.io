@@ -43,21 +43,29 @@ jobs:
           test -d src || { echo "src/ nicht gefunden — läuft dieser Schritt im Repo-Root?"; exit 1; }
 
           # Ein ":" im Dateinamen macht die Meldung "datei:zeile" mehrdeutig und würde
-          # den Dateivergleich der Skip-Ausnahme unten falsch zerlegen. Heute hat kein
-          # Pfad im Repo einen; käme einer dazu, bricht das Gate lieber ab, als eine
-          # Fundstelle falsch zu melden (PRI-87/PRI-88, Nit "Doppelpunkt im Dateinamen").
+          # den Dateivergleich der Skip-Ausnahme unten falsch zerlegen. Ein Zeilenumbruch
+          # im Dateinamen tut dasselbe von der anderen Seite: er zerlegt einen grep-Record
+          # in zwei und erzeugt aus einem echten Fund zwei Phantom-Fundstellen
+          # ("src/we:src/we" plus "ird.css:1"). Beides ist fail-closed — der Step geht
+          # trotzdem auf exit 1 —, aber die gemeldete Fundstelle schickt den Leser an die
+          # falsche Stelle (PRI-87 Finding 2, PRI-92 F-C). Heute hat kein Pfad im Repo
+          # eines von beidem; käme einer dazu, bricht das Gate lieber ab, als eine
+          # Fundstelle falsch zu melden.
           # Auch hier gilt: ein Fehler ist kein "nichts gefunden". Ohne diese Abfrage
           # würde errexit den Step kommentarlos töten (fail-closed, aber ohne Grund
           # im Log), etwa bei einem unlesbaren Verzeichnis unter src/.
-          odd_paths=$(find src -name '*:*') && find_rc=0 || find_rc=$?
+          # Die ANSI-C-Quotung $'*\n*' ist nötig; "*$(printf '\n')*" funktioniert NICHT —
+          # die Kommandosubstitution frisst den Zeilenumbruch, das Muster kollabiert zu
+          # "**" und träfe jede Datei.
+          odd_paths=$(find src \( -name '*:*' -o -name $'*\n*' \)) && find_rc=0 || find_rc=$?
           if [ "$find_rc" -ne 0 ]; then
             echo "find brach unter src/ mit Status ${find_rc} ab (Details auf stderr). Das Gate"
             echo "kann nicht bestätigen, dass src/ vollständig lesbar ist, und lehnt deshalb ab."
             exit 1
           fi
           if [ -n "$odd_paths" ]; then
-            echo "Pfade mit \":\" unter src/ gefunden — das Gate kann \"datei:zeile\" nicht"
-            echo "eindeutig melden und lehnt deshalb ab:"
+            echo "Pfade mit \":\" oder Zeilenumbruch unter src/ gefunden — das Gate kann"
+            echo "\"datei:zeile\" nicht eindeutig melden und lehnt deshalb ab:"
             printf '%s\n' "$odd_paths"
             exit 1
           fi
@@ -197,6 +205,13 @@ jobs:
           token  "ring"                  "ring-3 für die alte Optik, oder bewusst ring-1"  "src/styles/global.css"
           token  "outline-none"          "outline-hidden"
 
+          # Soll-Zahl der Muster, bewusst direkt unter der Liste und nicht oben bei
+          # checked=0: wer eine Zeile aus der Liste entfernt, sieht die Konstante im
+          # selben Diff-Hunk. Geprüft wird sie weiter unten, auf dem grünen Pfad —
+          # ein echter Fund soll zuerst im Log stehen und nicht von dieser Meldung
+          # verdeckt werden.
+          expected_patterns=18
+
           if [ -n "$findings" ]; then
             echo "Tailwind-3-Idiome in src/ gefunden — dieser PR wird abgelehnt."
             echo ""
@@ -206,6 +221,22 @@ jobs:
             echo "Warum dieses Gate existiert und warum einzelne Kandidaten bewusst nicht auf der"
             echo "Liste stehen: Issue PRI-80, Begründung auch als Kommentar in dieser Datei direkt"
             echo "über der Liste (.github/workflows/pr-build.yml)."
+            exit 1
+          fi
+
+          # Ohne diese Abfrage wird $checked gemeldet, aber nie geprüft — fällt eine
+          # token/prefix/scan-Zeile aus der Liste weg (Tippfehler, verunglückter Merge,
+          # Rebase-Konflikt in diesem Block), meldete das Gate zufrieden "17 Muster
+          # geprüft" und ginge grün. Niemand liest 17 gegen 18, solange nichts danach
+          # fragt. Das ist dieselbe Fehlerklasse, gegen die dieses Gate gebaut ist:
+          # eine plausible Erfolgsmeldung über einem nicht erfolgten Scan (PRI-92 F-A).
+          # Eine Listenänderung zieht expected_patterns mit; ein vergessener Bump ist
+          # rot, nicht still grün.
+          if [ "$checked" -ne "$expected_patterns" ]; then
+            echo "Das Gate hat ${checked} statt ${expected_patterns} Muster geprüft — die Liste"
+            echo "ist unvollständig. Wurde ein Muster absichtlich entfernt oder ergänzt, ist"
+            echo "expected_patterns in dieser Datei mitzuziehen (eine Listenänderung zieht nach"
+            echo "der Review-Matrix in CLAUDE.md den Security & Ops Auditor)."
             exit 1
           fi
 
