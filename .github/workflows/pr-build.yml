@@ -95,7 +95,10 @@ jobs:
           checked_labels=""
 
           # $1 = Muster, wie es im Log erscheint · $2 = ERE · $3 = die richtige Ersetzung
-          # $4 = optional: eine Datei, die für genau dieses Muster übersprungen wird
+          # $4 = optional: GENAU EINE Datei, die für dieses Muster übersprungen wird.
+          # Mehr als vier Argumente sind ein Fehlaufruf und werden laut abgelehnt, statt
+          # still verworfen zu werden (PRI-99 F-3/F-4): "${4:-}" bindet ein Skip, ein
+          # fünftes Argument hätte sonst keine Wirkung und niemand würde es merken.
           #
           # Ein fehlgeschlagener Scan darf nicht als "nichts gefunden" durchgehen — das
           # wäre genau das stille Grün, gegen das dieses Gate gebaut ist. grep liefert
@@ -106,6 +109,12 @@ jobs:
           # GNU grep meldet "binary file matches" auf stderr und erzeugt keinen Fund.
           scan() {
             local label="$1" re="$2" fix="$3" skip="${4:-}" out rc rec file lineno
+            if [ "$#" -gt 4 ]; then
+              echo "scan(): $# Argumente für das Muster \"${label}\" — gebunden werden nur vier."
+              echo "Ein zweites Skip-Argument hat keine Wirkung; dafür müsste scan() erweitert"
+              echo "werden. Das Gate lehnt ab, statt den Aufruf still halb auszuführen."
+              exit 1
+            fi
             checked=$((checked + 1))
             checked_labels="${checked_labels}${label}"$'\n'
             out=$(grep -rnaE -- "$re" src/) && rc=0 || rc=$?
@@ -202,9 +211,15 @@ jobs:
           # Notausgang, falls `ring` erneut auf Prosa anschlägt — damit rechnen, etwa in
           # einer englischen Projektbeschreibung unter src/content/projects/: PRI-80
           # erlaubt die Scope-Einschränkung ausdrücklich, aber nur mit einem Kommentar
-          # hier, der den konkreten Fund nennt. Dann also eine weitere Datei als
-          # viertes Argument eintragen (oder die Prosa umformulieren) — NICHT das Muster
-          # entfernen und nicht den Skip auf ein ganzes Verzeichnis verbreitern.
+          # hier, der den konkreten Fund nennt. Der kürzeste Weg ist, die Prosa
+          # umzuformulieren — NICHT das Muster entfernen und nicht den Skip auf ein
+          # ganzes Verzeichnis verbreitern.
+          # Achtung (PRI-99 F-3): eine ZWEITE Skip-Datei geht nicht nebenbei. scan()
+          # bindet genau ein Skip ("${4:-}"); ein fünftes Argument lehnt scan() jetzt
+          # laut ab, und die token-Zeile zu duplizieren scheitert am Doppel-Check weiter
+          # unten. Zwei Skip-Dateien brauchen also zuerst eine Erweiterung von scan()
+          # auf eine Liste — das ist eine Änderung an der Gate-Mechanik und zieht nach
+          # der Review-Matrix den Security & Ops Auditor.
           # Ein solcher Workflow-PR kommt an seinem eigenen Gate vorbei, solange die
           # auslösende Prosa nicht in seinem Branch liegt; das Gate kann sich also
           # nicht selbst aussperren.
@@ -239,14 +254,25 @@ jobs:
           # Eine Listenänderung zieht expected_patterns mit; ein vergessener Bump ist
           # rot, nicht still grün.
           #
-          # Der Vergleich darunter ist arithmetisch, und `test` bricht bei einem
-          # Nicht-Integer mit Status 2 ab statt mit 0 oder 1. Die Bedingung eines `if`
-          # ist von errexit ausgenommen, dort gilt Status 2 schlicht als "falsch": ein
-          # beschädigter Wert (leer, "l8", "18x" — der Vertipper, der an einer von Hand
-          # gepflegten Konstante naheliegt) machte diese Prüfung damit still zum No-Op,
-          # und das Gate lief in die Erfolgsmeldung. Also erst den Wert prüfen, dann
-          # vergleichen (PRI-96 Finding 1, PRI-97 F-1). Die ganz gelöschte Zeile ist
-          # dagegen harmlos: set -u tötet die Shell hart.
+          # Ein ARITHMETISCHER Vergleich wäre hier selbst ein stilles No-Op: `test`
+          # bricht bei einem Nicht-Integer mit Status 2 ab statt mit 0 oder 1, die
+          # Bedingung eines `if` ist von errexit ausgenommen, und dort gilt Status 2
+          # schlicht als "falsch" — die Prüfung entfiel, das Gate lief in die
+          # Erfolgsmeldung (PRI-96 Finding 1, PRI-97 F-1). Deshalb zwei Dinge:
+          #   1. der case-Guard prüft den Wert, bevor er verglichen wird. Er fängt die
+          #      realistischen Verunglückungen an einer von Hand gepflegten Konstante
+          #      (leer, "l8", "18x"); die ganz gelöschte Zeile ist ohnehin harmlos,
+          #      set -u tötet die Shell hart.
+          #   2. der Vergleich selbst ist ein STRING-Vergleich ("!=", nicht "-ne").
+          #      Ein case-Guard auf die Zeichenklasse allein reichte nicht: `test -ne`
+          #      bricht auch bei einer reinen Ziffernfolge über INTMAX_MAX mit Status 2
+          #      ab, und 9223372036854775808 passiert ''|*[!0-9]* (PRI-99 F-1,
+          #      PRI-100 S-1). "!=" kann nicht mit Status 2 abbrechen und schließt die
+          #      Klasse damit ganz, statt nur ihre wahrscheinlichen Fälle.
+          # Beide Operanden sind an dieser Stelle reine Dezimalziffernfolgen — $checked
+          # kommt aus $((checked + 1)) —, der String-Vergleich ist hier also gleich
+          # bedeutend. Nebeneffekt, gewollt: eine führende Null ("018") ist jetzt rot.
+          # Eine beschädigte Konstante soll ablehnen.
           case $expected_patterns in
             ''|*[!0-9]*)
               echo "expected_patterns ist keine Zahl (\"${expected_patterns}\") — die Konstante in"
@@ -255,7 +281,7 @@ jobs:
               exit 1
               ;;
           esac
-          if [ "$checked" -ne "$expected_patterns" ]; then
+          if [ "$checked" != "$expected_patterns" ]; then
             echo "Das Gate hat ${checked} statt ${expected_patterns} Muster geprüft — die Liste"
             echo "stimmt nicht mit expected_patterns überein. Wurde ein Muster absichtlich"
             echo "entfernt oder ergänzt, ist expected_patterns in dieser Datei mitzuziehen (eine"
