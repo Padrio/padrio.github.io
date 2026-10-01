@@ -42,29 +42,73 @@ jobs:
 
           test -d src || { echo "src/ nicht gefunden — läuft dieser Schritt im Repo-Root?"; exit 1; }
 
+          # Ein ":" im Dateinamen macht die Meldung "datei:zeile" mehrdeutig und würde
+          # den Dateivergleich der Skip-Ausnahme unten falsch zerlegen. Heute hat kein
+          # Pfad im Repo einen; käme einer dazu, bricht das Gate lieber ab, als eine
+          # Fundstelle falsch zu melden (PRI-87/PRI-88, Nit "Doppelpunkt im Dateinamen").
+          # Auch hier gilt: ein Fehler ist kein "nichts gefunden". Ohne diese Abfrage
+          # würde errexit den Step kommentarlos töten (fail-closed, aber ohne Grund
+          # im Log), etwa bei einem unlesbaren Verzeichnis unter src/.
+          odd_paths=$(find src -name '*:*') && find_rc=0 || find_rc=$?
+          if [ "$find_rc" -ne 0 ]; then
+            echo "find brach unter src/ mit Status ${find_rc} ab (Details auf stderr). Das Gate"
+            echo "kann nicht bestätigen, dass src/ vollständig lesbar ist, und lehnt deshalb ab."
+            exit 1
+          fi
+          if [ -n "$odd_paths" ]; then
+            echo "Pfade mit \":\" unter src/ gefunden — das Gate kann \"datei:zeile\" nicht"
+            echo "eindeutig melden und lehnt deshalb ab:"
+            printf '%s\n' "$odd_paths"
+            exit 1
+          fi
+
           # Token-Grenzen nach der in PRI-80 festgelegten Matching-Semantik:
           # links Zeilenanfang, Whitespace, Anführungszeichen, Backtick oder ":"
           # (damit "hover:shadow-sm", "md:shadow-sm", "group-hover:shadow-sm" treffen),
-          # rechts Zeilenende, Whitespace, Anführungszeichen oder Backtick.
+          # rechts Zeilenende, Whitespace, Anführungszeichen, Backtick oder ";".
           # Folgt daraus und ist so gewollt: "drop-shadow-sm" löst das Muster
           # "shadow-sm" NICHT aus — links davon steht ein "-", keine Tokengrenze.
           # Es hat seinen eigenen Eintrag in der Liste.
+          #
+          # Das ";" rechts ist mit PRI-80 nachgetragen (Finding beider Auditoren auf
+          # PRI-87/PRI-88): hinter der letzten Klasse einer @apply-Deklaration steht
+          # immer ein ";", und ohne diese Grenze war genau sie ungeprüft — in allen
+          # 19 @apply-Zeilen in src/ (legal.astro, privacy.astro, global.css).
+          # "@apply rounded-lg shadow-sm;" baute damit still grün durch.
           LB="(^|[[:space:]\"\`':])"
-          RB="([[:space:]\"\`']|\$)"
+          RB="([[:space:]\"\`';]|\$)"
 
           findings=""
           checked=0
 
           # $1 = Muster, wie es im Log erscheint · $2 = ERE · $3 = die richtige Ersetzung
           # $4 = optional: eine Datei, die für genau dieses Muster übersprungen wird
+          #
+          # Ein fehlgeschlagener Scan darf nicht als "nichts gefunden" durchgehen — das
+          # wäre genau das stille Grün, gegen das dieses Gate gebaut ist. grep liefert
+          # 0 = Treffer, 1 = kein Treffer, >= 2 = Fehler; ab 2 bricht der Step hart ab.
+          # Der Status wird dafür in dieser Shell ausgewertet und nicht in einer
+          # Prozess-Substitution verworfen, deren Ergebnis die Shell nie ansieht.
+          # "-a" behandelt Binärdateien als Text, statt sie still zu überspringen:
+          # GNU grep meldet "binary file matches" auf stderr und erzeugt keinen Fund.
           scan() {
-            local label="$1" re="$2" fix="$3" skip="${4:-}" loc
+            local label="$1" re="$2" fix="$3" skip="${4:-}" out rc rec file lineno
             checked=$((checked + 1))
-            while IFS= read -r loc; do
-              [ -n "$loc" ] || continue
-              if [ -n "$skip" ] && [ "${loc%%:*}" = "$skip" ]; then continue; fi
-              findings="${findings}  ${loc}  ${label}  ->  ${fix}"$'\n'
-            done < <(grep -rnE -- "$re" src/ | cut -d: -f1,2)
+            out=$(grep -rnaE -- "$re" src/) && rc=0 || rc=$?
+            if [ "$rc" -gt 1 ]; then
+              echo "grep brach beim Muster \"${label}\" mit Status ${rc} ab. Das Gate kann nicht"
+              echo "bestätigen, dass src/ geprüft wurde, und lehnt deshalb ab."
+              exit 1
+            fi
+            [ -n "$out" ] || return 0
+            while IFS= read -r rec; do
+              [ -n "$rec" ] || continue
+              file=${rec%%:*}
+              lineno=${rec#*:}
+              lineno=${lineno%%:*}
+              if [ -n "$skip" ] && [ "$file" = "$skip" ]; then continue; fi
+              findings="${findings}  ${file}:${lineno}  ${label}  ->  ${fix}"$'\n'
+            done <<< "$out"
           }
 
           # ganzes Klassen-Token bzw. Präfix; ein optionales $3 wird als Skip durchgereicht
@@ -112,7 +156,11 @@ jobs:
           token  "blur-sm"               "blur-xs"
           token  "drop-shadow-sm"        "drop-shadow-xs"
 
-          # literale Zeichenkette, kein Klassen-Token — "(" in der ERE maskiert
+          # literale Zeichenkette, kein Klassen-Token — "(" in der ERE maskiert.
+          # Bewusst für JEDES theme(), nicht nur für theme('fontFamily.…'): eine
+          # Farbabfrage wie theme('colors.orange.600') löst unter @config zwar auf,
+          # aber die Unterscheidung gehört nicht in eine Mustersuche. Wer hier
+          # hereinläuft, schreibt die CSS-Variable hin — kein Fehlalarm.
           scan   "theme("                "theme\("                 "CSS-Variable direkt, z. B. var(--color-…)"
 
           prefix "bg-opacity-"           "Slash-Syntax, z. B. bg-stone-900/50"
@@ -136,6 +184,16 @@ jobs:
           # @apply-Liste in genau dieser Datei würde das Gate nicht mehr sehen — die drei
           # @apply-Zeilen dort (:21, :47, :51) enthalten heute keins. Alle anderen Muster
           # prüfen global.css weiterhin vollständig.
+          #
+          # Notausgang, falls `ring` erneut auf Prosa anschlägt — damit rechnen, etwa in
+          # einer englischen Projektbeschreibung unter src/content/projects/: PRI-80
+          # erlaubt die Scope-Einschränkung ausdrücklich, aber nur mit einem Kommentar
+          # hier, der den konkreten Fund nennt. Dann also eine weitere Datei als
+          # viertes Argument eintragen (oder die Prosa umformulieren) — NICHT das Muster
+          # entfernen und nicht den Skip auf ein ganzes Verzeichnis verbreitern.
+          # Ein solcher Workflow-PR kommt an seinem eigenen Gate vorbei, solange die
+          # auslösende Prosa nicht in seinem Branch liegt; das Gate kann sich also
+          # nicht selbst aussperren.
           token  "ring"                  "ring-3 für die alte Optik, oder bewusst ring-1"  "src/styles/global.css"
           token  "outline-none"          "outline-hidden"
 

@@ -50,7 +50,8 @@ astro.config.mjs              site, Integrationen (icon, sitemap), Tailwind als 
 tailwind.config.mjs           Tailwind-Theme (u. a. max-w-content); `content` ist unter Tailwind 4 wirkungslos
 .cursorrules                  Design-System „Warm Minimalist" im Detail (Quelle für Regel 4)
 .github/workflows/deploy.yml  GitHub-Pages-Deploy (Push auf main + workflow_dispatch)
-.github/workflows/pr-build.yml  PR-Gate: npm ci + npm run build bei jedem PR gegen main (required status check)
+.github/workflows/pr-build.yml  PR-Gate bei jedem PR gegen main (required status check): erst ein
+                              Grep-Gate gegen Tailwind-3-Idiome in src/, dann npm ci + npm run build
 public/CNAME                  Custom Domain pkrason.de
 public/favicon.svg
 public/images/profile.jpg     Default-OG-Bild
