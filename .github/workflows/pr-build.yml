@@ -163,15 +163,43 @@ jobs:
           # |                         | mono') wird zu var(--font-mono) und damit zu totem Code       |                          |
           # | *-opacity-              | in TW4 entfernt, erzeugt stillschweigend kein CSS             | Slash-Syntax,            |
           # |                         |                                                               | z. B. bg-stone-900/50    |
-          # | flex-shrink- / -grow-   | in TW4 umbenannt                                              | shrink- / grow-          |
-          # | overflow-ellipsis       | in TW4 entfernt                                               | text-ellipsis            |
-          # | decoration-slice/-clone | in TW4 entfernt                                               | box-decoration-*         |
+          # | flex-shrink- / -grow-   | in TW4 umbenannt. Die alte Schreibweise emittiert weiter       | shrink- / grow-          |
+          # | flex-shrink / flex-grow | dieselbe Deklaration, ist also deprecated und nicht still      | shrink / grow            |
+          # | (auch nackt, ohne Zahl) | gebrochen — siehe den Block unter der Tabelle                  |                          |
+          # | overflow-ellipsis       | seit TW3.0 deprecated zugunsten von text-ellipsis. NICHT       | text-ellipsis            |
+          # |                         | entfernt: emittiert gegen 4.3.3 gemessen weiter               |                          |
+          # | decoration-slice/-clone | dito, zugunsten von box-decoration-*                          | box-decoration-*         |
           # | ring (nacktes Token)    | TW4 setzt die Default-Ringbreite von 3 px auf 1 px            | ring-3, oder bewusst     |
           # |                         |                                                               | ring-1                   |
           # | outline-none            | existiert weiter, bedeutet aber anderes: TW3 = outline: 2px   | outline-hidden           |
           # |                         | solid transparent (Fokus bleibt im Forced-Colors-Modus        |                          |
           # |                         | sichtbar), TW4 = outline-style: none. Still weggefallener     |                          |
           # |                         | Fokusring.                                                    |                          |
+          #
+          # Die Liste enthält zwei Klassen von Einträgen, und der Unterschied ist wichtig
+          # für jeden, der hier hereinläuft:
+          #   (a) STILL GEBROCHEN — die Klasse erzeugt unter TW4 kein CSS oder anderes
+          #       CSS als unter TW3: shadow-sm/rounded-sm/blur-sm/drop-shadow-sm
+          #       (verschobene Skala), *-opacity-* (entfernt, kein CSS), ring (1 px statt
+          #       3 px), outline-none (outline-style: none), theme( (totes var()).
+          #   (b) DEPRECATED, ABER FUNKTIONIEREND — die alte Schreibweise emittiert weiter
+          #       dieselbe Deklaration wie die neue: flex-grow/flex-shrink in beiden
+          #       Formen, overflow-ellipsis, decoration-slice/-clone.
+          # Gemessen am 2026-10-01 gegen das installierte tailwindcss 4.3.3, zweimal
+          # unabhängig: über compile() aus dem Paket und am gebauten dist/-CSS dieses
+          # Projekts (also mit dem @config-Legacy-Modus aus global.css). Je identische
+          # Deklaration für alte und neue Schreibweise:
+          #     .flex-grow{flex-grow:1}                  .grow{flex-grow:1}
+          #     .flex-shrink,.shrink{flex-shrink:1}      (vom Minifier zusammengelegt)
+          #     .overflow-ellipsis{text-overflow:ellipsis}
+          #     .decoration-slice{box-decoration-break:slice}
+          # Gegenkontrolle, damit die Messung nicht selbst fail-open ist: .bg-opacity-50
+          # kommt in beiden Messungen NICHT vor — die *-opacity-*-Familie ist wirklich
+          # weg, und ein frei erfundenes grow-bogus-xyz emittiert ebenfalls nichts.
+          # Die (b)-Einträge bleiben trotzdem auf der Liste: sie halten die Schreibweise
+          # im Repo einheitlich auf TW4. Dass die Liste sie enthält, ist eine
+          # Board-Entscheidung (PRI-80); wer sie für ein merge-blockierendes Gate zu
+          # streng findet, ändert das über das Board und nicht hier.
           #
           # Bewusst NICHT auf der Liste — bitte nicht "ergänzen":
           #   - nacktes `shadow`: gegen das ausgelieferte CSS auf pkrason.de geprüft,
@@ -203,6 +231,18 @@ jobs:
 
           prefix "flex-shrink-"          "shrink-"
           prefix "flex-grow-"            "grow-"
+
+          # Dieselben zwei Utilities nackt, ohne Zahl. Die Präfix-Muster darüber
+          # verlangen den Bindestrich, deshalb rutschte class="flex-grow" an ihnen vorbei
+          # (Vorschlag des Code Auditors auf PRI-87, Board-Entscheidung vom 2026-10-01:
+          # "als zwei Token-Muster aufnehmen").
+          # Überschneidungsfrei zu den Präfix-Mustern, gemessen: "flex-grow-0" hat rechts
+          # von "flex-grow" keine Tokengrenze und löst deshalb nur das Präfix-Muster aus;
+          # "flex-grow" hat keinen Bindestrich und löst nur dieses hier aus. Je genau ein
+          # Fund, nie zwei. Die Labels unterscheiden sich ("flex-grow" vs. "flex-grow-"),
+          # der Doppel-Check weiter unten schlägt also nicht an.
+          token  "flex-shrink"           "shrink"
+          token  "flex-grow"             "grow"
 
           token  "overflow-ellipsis"     "text-ellipsis"
           token  "decoration-slice"      "box-decoration-slice"
@@ -246,7 +286,7 @@ jobs:
           # selben Diff-Hunk. Geprüft wird sie weiter unten, auf dem grünen Pfad —
           # ein echter Fund soll zuerst im Log stehen und nicht von dieser Meldung
           # verdeckt werden.
-          expected_patterns=18
+          expected_patterns=20
 
           if [ -n "$findings" ]; then
             echo "Tailwind-3-Idiome in src/ gefunden — dieser PR wird abgelehnt."
