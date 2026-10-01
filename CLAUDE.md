@@ -46,7 +46,7 @@ ist, baut grün durch — ohne Linter meldet das sonst nichts.
 ## Struktur
 
 ```
-astro.config.mjs              site, Integrationen (icon, sitemap), Tailwind als Vite-Plugin, Redirects (Meta-Refresh, s. Regel 10), Shiki-Config
+astro.config.mjs              site, Integrationen (icon, sitemap), Tailwind als Vite-Plugin, Redirects (Meta-Refresh, s. Regel 10)
 tailwind.config.mjs           Tailwind-Theme (u. a. max-w-content); `content` ist unter Tailwind 4 wirkungslos
 .cursorrules                  Design-System „Warm Minimalist" im Detail (Quelle für Regel 4)
 .github/workflows/deploy.yml  GitHub-Pages-Deploy (Push auf main + workflow_dispatch)
