@@ -41,8 +41,8 @@ Es gibt **keine Tests und keinen Linter**. `npm run build` ist das einzige autom
 ## Struktur
 
 ```
-astro.config.mjs              site, Integrationen (tailwind, icon, sitemap), Redirects (Meta-Refresh, s. Regel 10), Shiki-Config
-tailwind.config.mjs           Tailwind-Theme (u. a. max-w-content)
+astro.config.mjs              site, Integrationen (icon, sitemap), Tailwind als Vite-Plugin, Redirects (Meta-Refresh, s. Regel 10), Shiki-Config
+tailwind.config.mjs           Tailwind-Theme (u. a. max-w-content); `content` ist unter Tailwind 4 wirkungslos
 .cursorrules                  Design-System „Warm Minimalist" im Detail (Quelle für Regel 4)
 .github/workflows/deploy.yml  GitHub-Pages-Deploy (Push auf main + workflow_dispatch)
 .github/workflows/pr-build.yml  PR-Gate: npm ci + npm run build bei jedem PR gegen main (required status check)
@@ -64,6 +64,13 @@ src/components/               Hero, CareerTimeline, ExperienceCard, ProjectCard,
 src/scripts/reveal.js         Staggered Scroll-Reveal (respektiert prefers-reduced-motion)
 src/styles/global.css         Tailwind-Layer, Basis-Styles, Skip-Link, Reveal-Styles
 ```
+
+**Annahme, auf der das Stylesheet beruht:** `src/styles/global.css` deklariert die Quellmenge für Tailwind
+als `@import "tailwindcss" source(none)` plus `@source "../../src"` — Tailwind scannt also ausschließlich
+`src/`, nicht das Repo-Root (sonst landen Klassennamen aus `CLAUDE.md` und `.cursorrules` im ausgelieferten
+CSS). Das setzt voraus, dass **jede klassentragende Datei unter `src/` liegt**. Wer ein Template außerhalb
+`src/` anlegt oder `global.css` verschiebt, muss `@source` mitziehen: sonst fallen Utilities still aus dem
+Stylesheet und `npm run build` bleibt trotzdem grün.
 
 ### Content-Collection-Schema (`src/content.config.ts`)
 

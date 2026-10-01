@@ -7,11 +7,12 @@ export async function getStaticPaths() {
   // Newest first, then alphabetically by id — must stay identical to the sort in
   // src/pages/index.astro so the "Selected Works" grid and prev/next agree.
   // The id tie-breaker is what keeps konteo-panel and konteo-provision (same date)
-  // in a stable order instead of inheriting directory enumeration order.
+  // in a stable order instead of inheriting the glob loader's file-read race.
+  // Locale-independent on purpose, see the note in src/pages/index.astro.
   const sortedProjects = projects.sort(
     (a, b) =>
       new Date(b.data.date).getTime() - new Date(a.data.date).getTime() ||
-      a.id.localeCompare(b.id)
+      (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
   );
 
   return sortedProjects.map((project, index) => ({
@@ -305,9 +306,12 @@ const projectJsonLd = {
     color: var(--color-orange-600);
     text-decoration: none;
     /* orange-200 has no utility usage anywhere in src/; this var() reference is
-       the only thing that makes Tailwind emit --color-orange-200. Drop it and
-       the underline silently disappears — the build stays green either way. */
-    border-bottom: 1px solid var(--color-orange-200);
+       the only thing that makes Tailwind emit --color-orange-200. Without the
+       fallback an undefined var() would take the whole border-bottom shorthand
+       down with it and the underline would vanish — the build stays green either
+       way. The fallback is the current Tailwind 4 oklch value, not a pinned
+       sRGB one. */
+    border-bottom: 1px solid var(--color-orange-200, oklch(90.1% 0.076 70.697));
     transition: border-color 0.2s;
   }
 

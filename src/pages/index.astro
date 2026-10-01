@@ -8,14 +8,17 @@ import { getCollection } from 'astro:content';
 const projects = await getCollection('projects', ({ data }) => data.featured);
 // Newest first, then alphabetically by id. konteo-panel and konteo-provision share
 // a date, so without the id tie-breaker their order is whatever getCollection()
-// happens to return — which is directory enumeration order and differs per checkout.
+// happens to return — and the glob loader resolves its file reads concurrently,
+// so that order is a race that can differ between two builds of the same commit.
+// The comparison is deliberately locale-independent: localeCompare() would make
+// the output depend on the runner's ICU version and default locale.
 // Keep this in sync with the identical sort in src/pages/projects/[slug].astro,
 // which drives prev/next.
 const featuredProjects = projects
   .sort(
     (a, b) =>
       new Date(b.data.date).getTime() - new Date(a.data.date).getTime() ||
-      a.id.localeCompare(b.id)
+      (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
   )
   .map((p) => ({
     title: p.data.title,
