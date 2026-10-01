@@ -8,29 +8,39 @@ const anchor = (hash: string) => (isHome ? hash : `/${hash}`);
   id="site-nav"
   class="sticky top-0 z-50 border-b border-stone-200/80 bg-stone-50/80 backdrop-blur-md backdrop-saturate-150 transition-shadow duration-300"
 >
+  {/* The unprefixed type and padding steps below `sm` keep the whole row inside
+      288px (a 320px viewport minus px-4); the `sm:` values are the design size
+      and are unchanged. Heights are deliberately untouched — min-h and py stay.
+
+      It fits, but only just: at 320px the row occupies 284.45px of those 288px
+      (logo 93.45 + link group 191), so there are 3.55px to spare. A fourth nav
+      link, a longer label or a wider font will overflow 320px again — that is a
+      layout change, not a tweak. A webfont failure is the safe direction:
+      without Inter the row measures 255.39px, so Inter is the widest case and
+      therefore the one these numbers were measured against. */}
   <div class="max-w-content mx-auto px-4 sm:px-7 py-2 sm:py-2.5 flex items-center justify-between">
     <a
       href="/"
-      class="text-[15px] sm:text-[17px] font-bold tracking-tight text-stone-900 whitespace-nowrap py-2 min-h-[44px] flex items-center"
+      class="text-[14px] sm:text-[17px] font-bold tracking-tight text-stone-900 whitespace-nowrap py-2 min-h-[44px] flex items-center"
     >
       Pascal Krason
     </a>
     <div class="flex items-center sm:gap-1">
       <a
         href={anchor('#career')}
-        class="text-[13.5px] sm:text-[14.5px] font-medium text-stone-600 hover:text-orange-600 transition-colors px-2 sm:px-3.5 py-2 rounded-lg min-h-[44px] flex items-center"
+        class="text-[13px] sm:text-[14.5px] font-medium text-stone-600 hover:text-orange-600 transition-colors px-1.5 sm:px-3.5 py-2 rounded-lg min-h-[44px] flex items-center"
       >
         Career
       </a>
       <a
         href={anchor('#works')}
-        class="text-[13.5px] sm:text-[14.5px] font-medium text-stone-600 hover:text-orange-600 transition-colors px-2 sm:px-3.5 py-2 rounded-lg min-h-[44px] flex items-center"
+        class="text-[13px] sm:text-[14.5px] font-medium text-stone-600 hover:text-orange-600 transition-colors px-1.5 sm:px-3.5 py-2 rounded-lg min-h-[44px] flex items-center"
       >
         Projects
       </a>
       <a
         href={anchor('#contact')}
-        class="text-[13.5px] sm:text-[14.5px] font-semibold text-white bg-orange-700 hover:bg-orange-800 transition-colors px-3 sm:px-4 py-2 rounded-lg ml-1 sm:ml-1.5 min-h-[40px] flex items-center"
+        class="text-[13px] sm:text-[14.5px] font-semibold text-white bg-orange-700 hover:bg-orange-800 transition-colors px-2.5 sm:px-4 py-2 rounded-lg ml-0.5 sm:ml-1.5 min-h-[40px] flex items-center"
       >
         Contact
       </a>
