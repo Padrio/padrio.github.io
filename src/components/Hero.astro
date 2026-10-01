@@ -11,6 +11,15 @@ const coreStack = [
 
 // Sekundäre Skills - dezente Mono-Pills
 const secondaryStack = ['Laravel', 'MySQL', 'Git', 'Nginx', 'Kubernetes', 'React', 'CI/CD'];
+
+// AI-gestützte Arbeitsweise - eigene Gruppe, gleiche Optik wie coreStack
+const aiStack = [
+  { name: 'Claude', icon: 'simple-icons:claude' },
+  { name: 'Codex', icon: 'simple-icons:openai' },
+  { name: 'Cursor', icon: 'simple-icons:cursor' },
+];
+
+const aiSecondary = ['Paperclip', 'MCP', 'vLLM', 'Ollama', 'Hugging Face', 'RAG', 'n8n', 'AI code review'];
 ---
 
 <header id="top" class="max-w-[760px] mx-auto px-4 sm:px-7 pt-16 sm:pt-[92px] pb-6 text-center flex flex-col items-center">
@@ -97,6 +106,30 @@ const secondaryStack = ['Laravel', 'MySQL', 'Git', 'Nginx', 'Kubernetes', 'React
     </ul>
     <ul class="flex justify-center gap-2.5 flex-wrap mt-5 list-none m-0 p-0">
       {secondaryStack.map((name) => (
+        <li class="font-mono text-xs text-stone-500 px-[11px] py-[5px] border border-stone-200 rounded-full">
+          {name}
+        </li>
+      ))}
+    </ul>
+  </div>
+
+  <!-- AI stack — second group, same optics as the tech stack above.
+       mt-10 is deliberately tighter than the mt-[52px] of the block above, so both
+       groups read as one pair and the about paragraph stays clearly set apart. -->
+  <div data-reveal class="mt-10 w-full">
+    <p class="font-mono text-[11.5px] tracking-[0.16em] text-stone-500 uppercase mb-[22px]">AI-Augmented Workflow</p>
+    <ul class="flex justify-center gap-6 sm:gap-[30px] flex-wrap list-none m-0 p-0">
+      {aiStack.map((tech) => (
+        <li class="flex flex-col items-center gap-[9px]">
+          <div class="w-14 h-14 rounded-[14px] bg-white border border-stone-200 flex items-center justify-center text-stone-900 shadow-sm">
+            <Icon name={tech.icon} class="w-7 h-7" aria-hidden="true" />
+          </div>
+          <span class="text-[12.5px] text-stone-500">{tech.name}</span>
+        </li>
+      ))}
+    </ul>
+    <ul class="flex justify-center gap-2.5 flex-wrap mt-5 list-none m-0 p-0">
+      {aiSecondary.map((name) => (
         <li class="font-mono text-xs text-stone-500 px-[11px] py-[5px] border border-stone-200 rounded-full">
           {name}
         </li>
