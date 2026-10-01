@@ -4,8 +4,15 @@ import { getCollection, render, type CollectionEntry } from 'astro:content';
 
 export async function getStaticPaths() {
   const projects: CollectionEntry<'projects'>[] = await getCollection('projects');
-  const sortedProjects = projects.sort((a, b) =>
-    new Date(b.data.date).getTime() - new Date(a.data.date).getTime()
+  // Newest first, then alphabetically by id — must stay identical to the sort in
+  // src/pages/index.astro so the "Selected Works" grid and prev/next agree.
+  // The id tie-breaker is what keeps konteo-panel and konteo-provision (same date)
+  // in a stable order instead of inheriting the glob loader's file-read race.
+  // Locale-independent on purpose, see the note in src/pages/index.astro.
+  const sortedProjects = projects.sort(
+    (a, b) =>
+      new Date(b.data.date).getTime() - new Date(a.data.date).getTime() ||
+      (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
   );
 
   return sortedProjects.map((project, index) => ({
@@ -201,7 +208,7 @@ const projectJsonLd = {
             <a
               href={`/projects/${prevProject.id}`}
               data-reveal
-              class="block bg-white border border-stone-200 rounded-[14px] px-[26px] py-[22px] transition-[transform,border-color,box-shadow] duration-200 hover:border-stone-300 motion-safe:hover:-translate-y-[3px] hover:shadow-[0_14px_28px_-18px_rgba(28,25,23,0.25)]"
+              class="block bg-white border border-stone-200 rounded-[14px] px-[26px] py-[22px] transition-[transform,translate,border-color,box-shadow] duration-200 hover:border-stone-300 motion-safe:hover:-translate-y-[3px] hover:shadow-[0_14px_28px_-18px_rgba(28,25,23,0.25)]"
             >
               <span class="block font-mono text-[11px] tracking-[0.1em] uppercase text-stone-500 mb-1.5">Previous</span>
               <span class="block font-bold text-[17px] text-stone-900">{prevProject.data.title}</span>
@@ -211,7 +218,7 @@ const projectJsonLd = {
             <a
               href={`/projects/${nextProject.id}`}
               data-reveal
-              class={`block bg-white border border-stone-200 rounded-[14px] px-[26px] py-[22px] text-right transition-[transform,border-color,box-shadow] duration-200 hover:border-stone-300 motion-safe:hover:-translate-y-[3px] hover:shadow-[0_14px_28px_-18px_rgba(28,25,23,0.25)] ${!prevProject ? 'sm:col-start-2' : ''}`}
+              class={`block bg-white border border-stone-200 rounded-[14px] px-[26px] py-[22px] text-right transition-[transform,translate,border-color,box-shadow] duration-200 hover:border-stone-300 motion-safe:hover:-translate-y-[3px] hover:shadow-[0_14px_28px_-18px_rgba(28,25,23,0.25)] ${!prevProject ? 'sm:col-start-2' : ''}`}
             >
               <span class="block font-mono text-[11px] tracking-[0.1em] uppercase text-stone-500 mb-1.5">Next</span>
               <span class="block font-bold text-[17px] text-stone-900">{nextProject.data.title}</span>
@@ -298,7 +305,13 @@ const projectJsonLd = {
   .prose-project a {
     color: var(--color-orange-600);
     text-decoration: none;
-    border-bottom: 1px solid var(--color-orange-200);
+    /* orange-200 has no utility usage anywhere in src/; this var() reference is
+       the only thing that makes Tailwind emit --color-orange-200. Without the
+       fallback an undefined var() would take the whole border-bottom shorthand
+       down with it and the underline would vanish — the build stays green either
+       way. The fallback is the current Tailwind 4 oklch value, not a pinned
+       sRGB one. */
+    border-bottom: 1px solid var(--color-orange-200, oklch(90.1% 0.076 70.697));
     transition: border-color 0.2s;
   }
 
@@ -312,8 +325,10 @@ const projectJsonLd = {
   }
 
   .prose-project code {
-    /* Tailwind 4 inlines fontFamily aus der Legacy-Config in die Utility und gibt
-       dafür keine CSS-Variable aus — derselbe Stack wie font-mono, hier literal. */
+    /* Literal copy of theme.extend.fontFamily.mono in tailwind.config.mjs — change
+       it in both places. Tailwind 4 inlines fontFamily from a legacy @config into
+       the .font-mono utility and emits no --font-* variable, so var(--font-mono)
+       would be dead code here and would invalidate the declaration. */
     font-family: 'JetBrains Mono', ui-monospace, monospace;
     font-size: 0.84em;
     background: var(--color-stone-100);

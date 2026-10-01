@@ -1,4 +1,9 @@
-@import "tailwindcss";
+/* Tailwind 4 ignores the `content` globs from a legacy @config and auto-detects
+   sources from the project root instead, which pulls utility names out of
+   CLAUDE.md and .cursorrules into the shipped stylesheet. source(none) turns the
+   auto-detection off; @source restores the glob the config already declares. */
+@import "tailwindcss" source(none);
+@source "../../src";
 @config "../../tailwind.config.mjs";
 
 @layer base {
@@ -21,7 +26,11 @@
 
   a:focus-visible,
   button:focus-visible {
-    outline: 2px solid var(--color-orange-600);
+    /* Colour kept out of the `outline` shorthand on purpose: an unresolvable
+       var() would invalidate the whole shorthand and leave no focus ring at all,
+       instead of only losing the colour. */
+    outline: 2px solid;
+    outline-color: var(--color-orange-600);
     outline-offset: 3px;
     border-radius: 8px;
   }

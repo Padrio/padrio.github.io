@@ -15,7 +15,7 @@ const linkHref = href || (slug ? `/projects/${slug}` : '#');
 
 <a
   href={linkHref}
-  class="group relative flex flex-col h-full bg-white border border-stone-200 rounded-[18px] overflow-hidden shadow-xs transition-[transform,box-shadow] duration-150 motion-safe:hover:-translate-y-[3px] hover:shadow-[0_16px_32px_-16px_rgba(28,25,23,0.18)]"
+  class="group relative flex flex-col h-full bg-white border border-stone-200 rounded-[18px] overflow-hidden shadow-xs transition-[transform,translate,box-shadow] duration-150 motion-safe:hover:-translate-y-[3px] hover:shadow-[0_16px_32px_-16px_rgba(28,25,23,0.18)]"
 >
   <div class="relative h-[190px] overflow-hidden bg-stone-100">
     {image ? (
@@ -42,7 +42,7 @@ const linkHref = href || (slug ? `/projects/${slug}` : '#');
   <!-- hover arrow chip -->
   <span
     aria-hidden="true"
-    class="absolute top-3 right-3 z-[3] w-[34px] h-[34px] rounded-full bg-orange-600 flex items-center justify-center shadow-[0_6px_16px_-6px_rgba(234,88,12,0.6)] opacity-0 -translate-y-1.5 scale-75 transition-[opacity,transform] duration-300 group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100 motion-reduce:transition-none"
+    class="absolute top-3 right-3 z-[3] w-[34px] h-[34px] rounded-full bg-orange-600 flex items-center justify-center shadow-[0_6px_16px_-6px_rgba(234,88,12,0.6)] opacity-0 -translate-y-1.5 scale-75 transition-[opacity,transform,translate,scale] duration-300 group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100 motion-reduce:transition-none"
   >
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
       <path d="M7 17L17 7"/><path d="M7 7h10v10"/>

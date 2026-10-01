@@ -17,10 +17,10 @@ Diese Datei wird automatisch gelesen und ist die maßgebliche Quelle für Projek
 | Deploy | `.github/workflows/deploy.yml` — läuft bei **jedem** Push auf `main` |
 | PR-Gate | `.github/workflows/pr-build.yml` — Job-Key und Status-Kontext `pr-build`, läuft bei jedem Pull Request gegen `main` |
 | Merge-Gate `main` | Repository Ruleset `main: pr-build required` (id `24245581`) auf dem Default-Branch, `enforcement: active`, `bypass_actors: []`. Keine klassische Branch Protection — im UI unter *Settings → Rules*. Details und Konsequenz in **Runtime-Realität**. |
-| Framework | Astro 5.18, rein statisch (kein SSR, kein Adapter) |
-| Versionen | Alle Versionen hier sind der Ist-Stand aus `package-lock.json`; maßgeblich ist der Lockfile, `npm ci` installiert deterministisch daraus. `package.json` führt weitere Ranges (z. B. `astro: ^5.18.2`). |
-| Styling | Tailwind CSS 3.4 via `@astrojs/tailwind`, plus `@tailwindcss/typography` |
-| Icons | `astro-icon` 1.1 mit `@iconify-json/simple-icons` |
+| Framework | Astro 7.3.5, rein statisch (kein SSR, kein Adapter) |
+| Versionen | Alle Versionen hier sind der Ist-Stand aus `package-lock.json`; maßgeblich ist der Lockfile, `npm ci` installiert deterministisch daraus. `package.json` führt weitere Ranges (z. B. `astro: ^7.3.5`). |
+| Styling | Tailwind CSS 4.3.3 via `@tailwindcss/vite` (als Vite-Plugin in `astro.config.mjs`, **nicht** als Astro-Integration — `@astrojs/tailwind` ist aufgegeben und deinstalliert), plus `@tailwindcss/typography`. Theme weiter in `tailwind.config.mjs`, eingebunden per `@config` in `src/styles/global.css`. |
+| Icons | `astro-icon` 1.2 mit `@iconify-json/simple-icons` |
 | SEO | `@astrojs/sitemap` |
 | Fonts | `@fontsource/inter` und `@fontsource/jetbrains-mono` — selbst gehostet, keine externen Requests |
 | Analytics | Microsoft Clarity (`@microsoft/clarity`), Projekt-ID in `src/layouts/Layout.astro` |
@@ -41,8 +41,8 @@ Es gibt **keine Tests und keinen Linter**. `npm run build` ist das einzige autom
 ## Struktur
 
 ```
-astro.config.mjs              site, Integrationen (tailwind, icon, sitemap), Redirects (Meta-Refresh, s. Regel 10), Shiki-Config
-tailwind.config.mjs           Tailwind-Theme (u. a. max-w-content)
+astro.config.mjs              site, Integrationen (icon, sitemap), Tailwind als Vite-Plugin, Redirects (Meta-Refresh, s. Regel 10), Shiki-Config
+tailwind.config.mjs           Tailwind-Theme (u. a. max-w-content); `content` ist unter Tailwind 4 wirkungslos
 .cursorrules                  Design-System „Warm Minimalist" im Detail (Quelle für Regel 4)
 .github/workflows/deploy.yml  GitHub-Pages-Deploy (Push auf main + workflow_dispatch)
 .github/workflows/pr-build.yml  PR-Gate: npm ci + npm run build bei jedem PR gegen main (required status check)
@@ -64,6 +64,13 @@ src/components/               Hero, CareerTimeline, ExperienceCard, ProjectCard,
 src/scripts/reveal.js         Staggered Scroll-Reveal (respektiert prefers-reduced-motion)
 src/styles/global.css         Tailwind-Layer, Basis-Styles, Skip-Link, Reveal-Styles
 ```
+
+**Annahme, auf der das Stylesheet beruht:** `src/styles/global.css` deklariert die Quellmenge für Tailwind
+als `@import "tailwindcss" source(none)` plus `@source "../../src"` — Tailwind scannt also ausschließlich
+`src/`, nicht das Repo-Root (sonst landen Klassennamen aus `CLAUDE.md` und `.cursorrules` im ausgelieferten
+CSS). Das setzt voraus, dass **jede klassentragende Datei unter `src/` liegt**. Wer ein Template außerhalb
+`src/` anlegt oder `global.css` verschiebt, muss `@source` mitziehen: sonst fallen Utilities still aus dem
+Stylesheet und `npm run build` bleibt trotzdem grün.
 
 ### Content-Collection-Schema (`src/content.config.ts`)
 
