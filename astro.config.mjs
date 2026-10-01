@@ -31,11 +31,5 @@ export default defineConfig({
       status: 301,
       destination: '/'
     }
-  },
-  markdown: {
-    shikiConfig: {
-      theme: 'github-dark',
-      wrap: true
-    }
   }
 });
