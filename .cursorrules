@@ -29,7 +29,7 @@ The goal is a friendly, inviting, and highly readable design that appeals to bot
 
 ## 4. Responsive Strategy
 - **Mobile First:** Write CSS starting with mobile layout.
-- **Touch Targets:** Ensure 44px+ size for touch inputs on mobile.
+- **Touch Targets:** Standalone controls — buttons, CTAs, navigation and footer links, card and sidebar links — have an effective hit area of at least 44px on both axes. Exempt are links inside body copy (today the wrappers `.prose` and `.prose-project`), entries of dense list navigations (the scroll-spy TOC), and the skip link as a keyboard-only target. **Every** interactive element has a floor of 24px (WCAG 2.2 AA, 2.5.8) — with the same inline exception 2.5.8 itself grants for links within a sentence. Provenance: 44px is WCAG 2.5.5 **AAA**, the stricter level this site holds voluntarily; the 24px floor is the binding AA value from WCAG 2.2, 2.5.8. The exemption list marks the boundary between the voluntary AAA goal and the mandatory AA value, not a lowering of the bar. Board decision 2026-10-01 (PRI-85), implemented in code by PRI-110. Two clarifications are not board wording but were added while writing this down (justified in PR #30): the board version stated the 24px floor **without** exception, and named only `.prose` as the body-copy wrapper. The wrapper list is a snapshot of the current code, not a closed definition — verify it against the code rather than copying it into a gate. Mirrors rule 4 in `CLAUDE.md`; keep both in sync.
 - **Typography Scaling:** Ensure headlines do not break awkwardly on small screens.
 
 # Coding Rules
