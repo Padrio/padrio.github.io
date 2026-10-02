@@ -175,7 +175,7 @@ Im Agent-Workspace verifiziert. Diese Punkte kosten sonst jeden Agent einen Fehl
 
   ```bash
   SHELL_BIN=~/.cache/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-linux64/chrome-headless-shell
-  FULL_BIN=~/.cache/ms-playwright/chromium-1243/chrome-linux64/chrome   # läuft auch, klemmt aber Viewports — siehe unten
+  FULL_BIN=~/.cache/ms-playwright/chromium-1243/chrome-linux64/chrome   # läuft auch; --window-size klemmt dort (siehe unten), setDeviceMetricsOverride ist auf diesem Binary ungeprüft
   ```
 
   Kein `apt`, kein `npx playwright install`. Der Browser liegt **außerhalb des Repos**: `playwright`, `puppeteer` und `ws` sind nicht installiert und werden nicht gebraucht, `package.json` und `package-lock.json` bleiben unberührt — **Regel 8 ist davon nicht betroffen.** Node 24.21 hat hier ein globales `WebSocket`; ein vollständiger DevTools-Protocol-Client ist damit rund 40 Zeilen ohne jede Dependency.
@@ -187,39 +187,81 @@ Im Agent-Workspace verifiziert. Diese Punkte kosten sonst jeden Agent einen Fehl
   # <html><head></head><body><p>hi</p></body></html>
   ```
 
-  **Für echte Messungen CDP statt `--dump-dom`.** Start mit `--remote-debugging-port=0` (kollidiert nicht mit parallelen Runs), die `ws://`-URL kommt von stderr, dann `Target.createTarget` → `Target.attachToTarget {flatten:true}` und jeder weitere Aufruf mit der `sessionId`:
+  **stderr ist auch im Erfolgsfall laut.** Derselbe Aufruf schreibt bei Exit 0 und korrektem DOM mehrere `ERROR:dbus/…`-Zeilen und eine `WARNING:sandbox/policy/linux/…` auf stderr — hier vier plus eine, 840 Byte. Wer mit `2>&1` arbeitet, sieht `ERROR` neben einem völlig richtigen Ergebnis: dieses Rauschen ist irrelevant, die Unterscheidung macht der Exit-Code und ob auf **stdout** etwas ankommt.
+
+  **Für echte Messungen CDP statt `--dump-dom`.** Start mit `--remote-debugging-port=0` (kollidiert nicht mit parallelen Runs), die `ws://`-URL kommt von stderr, dann `Target.createTarget` → `Target.attachToTarget {flatten:true}` und jeder weitere Aufruf mit der `sessionId`. **Die `sessionId` ist ein Top-Level-Feld der CDP-Nachricht, nicht Teil von `params`** — in `params` gelegt antwortet Chrome mit `-32601 'Runtime.enable' wasn't found`, also einem Fehler, der genau wie das Versionsproblem aus dem nächsten Absatz aussieht. Dieser Block läuft unverändert:
 
   ```js
+  import { spawn } from 'node:child_process';
+
   const proc = spawn(SHELL_BIN, ['--headless', '--no-sandbox', '--disable-gpu',
     '--remote-debugging-port=0', 'about:blank']);   // positionales about:blank: siehe unten
-  // ws://-URL aus proc.stderr lesen, dann:
-  const ws = new WebSocket(wsUrl);                  // global, kein Paket nötig
-  // Target.createTarget  {url:'about:blank'}        -> targetId
-  // Target.attachToTarget {targetId, flatten:true}  -> sessionId
-  // Page.enable / Runtime.enable mit {sessionId}, danach Runtime.evaluate
+  try {
+    const wsUrl = await new Promise((res, rej) => {   // die ws://-URL kommt auf stderr
+      let buf = '';
+      proc.stderr.on('data', (d) => { buf += d; const m = buf.match(/ws:\/\/\S+/); if (m) res(m[0]); });
+      proc.on('exit', (c) => rej(new Error(`Chrome endete mit ${c}: ${buf}`)));
+    });
+    const ws = new WebSocket(wsUrl);                  // global in Node 24, kein Paket nötig
+    await new Promise((res) => { ws.onopen = res; });
+    let id = 0; const pending = new Map();
+    ws.onmessage = (ev) => {
+      const m = JSON.parse(ev.data);
+      if (!pending.has(m.id)) return;
+      const { res, rej } = pending.get(m.id); pending.delete(m.id);
+      m.error ? rej(new Error(`${m.error.code} ${m.error.message}`)) : res(m.result);
+    };
+    const send = (method, params = {}, sessionId) => new Promise((res, rej) => {
+      const mid = ++id; pending.set(mid, { res, rej });
+      ws.send(JSON.stringify({ id: mid, method, params, ...(sessionId ? { sessionId } : {}) }));
+    });
+
+    const { targetId } = await send('Target.createTarget', { url: 'about:blank' });
+    const { sessionId } = await send('Target.attachToTarget', { targetId, flatten: true });
+    await send('Page.enable', {}, sessionId);
+    await send('Runtime.enable', {}, sessionId);
+    // … setDeviceMetricsOverride, Page.navigate, Runtime.evaluate — alle mit {sessionId}
+  } finally {
+    proc.kill();   // in finally, sonst bleibt der Baum bei jedem Abbruch liegen — siehe „Aufräumen"
+  }
   ```
+
+  **Auf `document.readyState` allein zu warten ist eine Falle.** `about:blank` ist bereits `complete`, eine Warteschleife kehrt also *vor* dem Commit der neuen Seite zurück; der nächste `querySelector` liefert `null` und das liest sich wie „Element fehlt". Zusätzlich auf einen geänderten `location.href` prüfen — und bei einem lokalen Server gilt dasselbe für den Server selbst: ein gebundener, aber toter Port liefert eine Fehlerseite, auf der dann *jede* Messung „nicht vorhanden" meldet. Erst mit `fetch`/`curl` zusichern, dass die Seite wirklich ausgeliefert wird, dann den Browser darauf richten.
 
   Das positionale `about:blank` als letztes Argument ist nur dann nötig, wenn das Skript ein **vorhandenes** Page-Target aus `Target.getTargets` greift: ohne das Argument liefert `Target.getTargets` bei `chrome-headless-shell` eine **leere** Liste, das Skript stirbt an `Cannot read properties of undefined (reading 'targetId')` und das sieht wie ein CDP-Versionsproblem aus. `Target.createTarget` funktioniert dagegen in jedem Fall. Setz das Argument trotzdem — es kostet nichts und macht beide Wege gültig.
 
   CDP kann, was `--dump-dom` nicht kann: `Runtime.evaluate` mit `awaitPromise` (Proben, die klicken, scrollen und warten), `Emulation.setDeviceMetricsOverride` für echte Viewports, `Emulation.setEmulatedMedia` für `prefers-reduced-motion` pro Target, `Runtime.exceptionThrown` für echte Konsolenfehler, `Page.captureScreenshot` mit `clip`.
 
-  **Viewports über `Emulation.setDeviceMetricsOverride`, nicht über `--window-size`.** Standardsatz: **320, 390, 768, 1280 px.** 320 ist die schmalste real relevante Breite und die, bei der dieses Projekt wiederholt Overflow hatte ([PRI-84](/PRI/issues/PRI-84)); 390 das iPhone-Maß; 768 der `sm:`-Bereich oberhalb des 640-px-Breakpoints; 1280 der Desktop-Stand. Abweichungen sind erlaubt, müssen aber im Review benannt werden. Zwei Fallen:
+  **Viewports über `Emulation.setDeviceMetricsOverride`, nicht über `--window-size`.** Standardsatz: **320, 390, 768, 1280 px.** 320 ist die schmalste real relevante Breite und die, bei der dieses Projekt wiederholt Overflow hatte ([PRI-84](/PRI/issues/PRI-84)); 390 das iPhone-Maß; 768 der `md:`-Breakpoint (48 rem); 1280 der Desktop-Stand im `lg:`-Band (`xl:` kommt im Bundle nicht vor). Abweichungen sind erlaubt, müssen aber im Review benannt werden.
+
+  **Der Standardsatz hat eine bekannte Lücke — nenne sie, wenn du bei vier Werten bleibst.** Das Bundle kennt genau drei Breiten-Media-Queries: 640 px (`sm:`), 768 px (`md:`), 1024 px (`lg:`). In `src/` stehen dem **47** `sm:`-Verwendungen gegenüber genau **2** `md:`-Stellen (die `h1` in `legal.astro` und `privacy.astro`) und 11 `lg:`-Stellen; sieben Dateien nutzen `sm:` ohne jedes `md:`. Das Band **640–767 px**, in dem diese 47 Utilities allein greifen, besucht der Standardsatz nie: 320 und 390 liegen darunter, 768 und 1280 darüber. Bei 768 misst man `md:`, nicht „`sm:` oberhalb von 640". Wer über das `sm:`-Band etwas aussagen will, nimmt **700 px** dazu; wer bei den vier Werten bleibt, schreibt in das Review, dass 640–767 ungeprüft ist. Drei Fallen:
 
   - `--window-size=320,800` wird vom vollständigen `chrome` auf `innerWidth 500` geklemmt; `chrome-headless-shell` liefert dort 320. Verlass dich auf keines von beidem.
   - `setDeviceMetricsOverride {width:320, mobile:true}` ergibt auf einer Seite **ohne** `<meta name="viewport">` `innerWidth 980` statt 320 — das ist Chromes Mobile-Fallback-Layoutbreite, keine Messung. Die ausgelieferten Seiten tragen das Meta-Tag und messen exakt; eine selbstgebaute Probe-Seite braucht es ebenfalls, sonst `mobile:false` setzen. **Prüfe `innerWidth` immer als Zusicherung gegen die angeforderte Breite.**
+  - **Miss nicht in einem `<iframe>`.** Ist der Inhalt höher als der Rahmen, nimmt die Scrollbar 15 px vom Layout: ein 320-px-Iframe meldet `innerWidth` weiterhin **320** — der Wert enthält die Scrollbar und kann den Effekt per Definition nicht zeigen —, aber `documentElement.clientWidth` und `scrollWidth` stehen auf **305**. Dieselbe Seite als Top-Level-Target bei 320 px: 320/320. Ein 15-px-Phantom-Overflow bei genau 320 px ist die wiederkehrende Fehlerklasse dieses Projekts ([PRI-84](/PRI/issues/PRI-84)) — also ohne Iframe messen, und wenn es einer sein muss, `Emulation.setScrollbarsHidden {hidden:true}` setzen (stellt 320/320 wieder her) und `clientWidth` lesen, nicht `innerWidth`.
 
   **Für eine Frage zum ausgelieferten Zustand direkt `https://pkrason.de` messen.** Der Runner hat Netzzugang; `Page.navigate` auf die Live-URLs kostet keinen Worktree, kein `npm ci` und keinen lokalen Server, Seitenliste aus `https://pkrason.de/sitemap-0.xml`. Zwei Bedingungen: nur gültig, wenn der Live-Stand der gemeinte Commit ist, und für einen Baseline-gegen-Branch-Vergleich untauglich.
 
-  **Für einen Vergleich die Baseline immer mitbauen.** `origin/main` in einen zweiten Worktree, `node_modules` per `cp -r` statt eines zweiten `npm ci`, sequenziell bauen. **Baseline gegen Baseline muss 0 Unterschiede ergeben, bevor ein Delta etwas bedeutet.** Ein lokaler Server genügt als `python3 -m http.server <port> --bind 127.0.0.1 --directory dist`; das ist auf dem hier installierten Python 3.14 ein `ThreadingHTTPServer`, eine Seite mit `<iframe>` lädt damit in ~0,6 s.
+  **Für einen Vergleich die Baseline immer mitbauen.** `origin/main` in einen zweiten Worktree, `node_modules` per `cp -r` **aus dem frisch installierten Worktree** statt eines zweiten `npm ci`, sequenziell bauen. Nicht aus dem gemeinsamen Checkout kopieren: der hinkt `origin/main` oft hinterher, sein `node_modules` passt dann zum alten Lockfile und der Build stirbt an einem irreführenden `Cannot find module`. **Baseline gegen Baseline muss 0 Unterschiede ergeben, bevor ein Delta etwas bedeutet.** Ein lokaler Server genügt als `python3 -m http.server <port> --bind 127.0.0.1 --directory dist`; das ist auf dem hier installierten Python 3.14 ein `ThreadingHTTPServer`, eine Seite mit `<iframe>` lädt damit in ~0,2 s.
 
-  **Scroll-Animation ist die größte Quelle erfundener Findings.** `html` trägt `scroll-behavior: smooth`, und alles, was während eines laufenden Scrolls gemessen wird, ist Rauschen und sieht genau wie ein Befund aus. Gemessen auf der Startseite: Klick auf den ersten In-Page-Anchor und `scrollY` direkt danach gelesen ergibt **0**, nach drei stabilen Frames **65**. Zwei Maßnahmen, beide nötig — `*{scroll-behavior:auto !important}` injizieren (danach steht der Wert sofort auf 65) und per `requestAnimationFrame` warten, bis `scrollY` drei Frames konstant ist. Dazu eine Messreihe nehmen und auf Konstanz prüfen, bevor man sie diffed.
+  **Scroll-Animation ist die größte Quelle erfundener Findings.** `html` trägt `scroll-behavior: smooth`, und alles, was während eines laufenden Scrolls gemessen wird, ist Rauschen und sieht genau wie ein Befund aus. Gemessen auf der Startseite, Klick auf den ersten In-Page-Anchor (`#main`), Soll-Wert `scrollY` = 65, je 20 Wiederholungen pro Variante:
+
+  - **`*{scroll-behavior:auto !important}` injizieren ist Pflicht.** Damit 20/20 korrekt, jedes Mal nach 4 Frames.
+  - **Auf stabile Frames allein verlassen ist fail-open.** Drei konstante `requestAnimationFrame`-Frames ohne die Injektion: **10 von 20** Messungen liefern **0** statt 65 — den un-gescrollten Ausgangswert, also genau einen „Element ist nicht da, wo es sein soll"-Befund. Mehr Frames helfen nicht: 30 statt 3 ergibt dieselben 10/20. Ursache: die stabilen Frames können noch *vor* dem Start der Animation liegen, dann bricht die Schleife auf dem Ausgangswert ab.
+  - `Emulation.setEmulatedMedia {prefers-reduced-motion: reduce}` wirkt genauso (20/20, `scroll-behavior` wird dadurch `auto`, vgl. `src/styles/global.css`), schaltet aber auch die Reveal-Animationen ab — kein Ersatz, wenn gerade die geprüft werden sollen.
+
+  Das rAF-Warten bleibt als Absicherung sinnvoll, **darf aber nie allein tragen.** Dazu eine Messreihe nehmen und auf Konstanz prüfen, bevor man sie diffed.
 
   **Zwei Messfallen, die ein falsches Ergebnis plausibel aussehen lassen:**
 
-  - *Welche Schrift gerendert hat, entscheidet die Zahl.* Vor jeder Breitenaussage `await document.fonts.ready` abwarten und `document.fonts.check('400 16px "JetBrains Mono"')` prüfen. Gemessen auf der Live-Seite bei `font-size: 16px`: mit geladenem JetBrains Mono 10,00 px Advance pro Zeichen, mit `ui-monospace` 9,60 px. Eine still zurückgefallene Messung liegt also nur 4 % daneben und fällt von selbst nicht auf.
-  - *Farben kommen unter Tailwind 4 als rohes `oklch(…)` aus `getComputedStyle`.* Ein `match(/[\d.]+/g)`-Parser liest L/C/H als R/G/B und liefert Unsinn, der wie eine Zahl aussieht — für `stone-500` auf `stone-50` 602,6 statt 4,58. Über ein 1×1-Canvas auflösen und dabei **komponieren**: erst den Hintergrund füllen, dann die Farbe darüber, sonst wird jede Transparenz zu Schwarz.
+  - *Welche Schrift gerendert hat, entscheidet die Zahl.* Vor jeder Breitenaussage `await document.fonts.ready` abwarten und `document.fonts.check('400 16px "JetBrains Mono"')` prüfen. Gemessen auf der Live-Seite bei `font-size: 16px`, Advance pro Zeichen: ausgelieferter Stack `"JetBrains Mono", ui-monospace, monospace` mit geladener Font **10,00 px**, mit blockierter Font-Datei **9,60 px** — der Stack landet dann auf generischem `monospace`. Nicht auf `ui-monospace`: dieses Keyword wird im Stack übersprungen und ergibt isoliert gemessen 14,23 px. Eine still zurückgefallene Messung liegt also nur **4 %** daneben und fällt von selbst nicht auf.
+  - *Farben kommen unter Tailwind 4 als rohes `oklch(…)` aus `getComputedStyle`.* Ein `match(/[\d.]+/g)`-Parser liest L/C/H als R/G/B. Gefährlich ist nicht, dass Unsinn herauskommt, sondern dass **plausibler** Unsinn herauskommt: der korrekte Kontrast von `stone-500` auf `stone-50` ist **4,58**; vier naive Parser-Varianten ergaben 1,14, 1,14, 3,21 und **4,27**. Der letzte Wert liegt knapp *unter* 4,5 und geht damit als echter Kontrastverstoß durch, wo tatsächlich keiner ist. Über ein 1×1-Canvas auflösen und dabei **komponieren**: erst den Hintergrund füllen, dann die Farbe darüber, sonst wird jede Transparenz zu Schwarz.
 
-  **Aufräumen und Scratch.** Chrome über die aufgezeichnete PID beenden, **niemals über `pkill -f <muster>`** — das Muster matcht die eigene Shell (geprüft: `/proc/$$/cmdline` der Agent-Shell enthält das Muster, `pgrep -f` listet die eigene PID) und beendet sie mit Exit 144 ohne jede Ausgabe. Und `PAPERCLIP_RUN_SCRATCH_DIR` liegt auf einem ~1,9 GB tmpfs, das sich alle parallelen Runs teilen: zwei gleichzeitige `npm ci` füllen es, und dann verliert *jeder* Bash-Aufruf seine Ausgabe, weil die Task-Output-Dateien der Harness dort ebenfalls liegen. Mess-Worktrees neben das Repo auf `/`, nicht ins tmpfs.
+  **Aufräumen.** Chrome über die aufgezeichnete PID beenden (`ps -eo pid,ppid,comm`), **niemals über `pkill -f <muster>`** — das Muster matcht die eigene Shell, deren Kommandozeile es ja enthält, und erschießt sie: gemessen Exit **143** (SIGTERM) bei **0 Byte** Ausgabe, in einem von zwei Läufen starb der umgebende Bash-Aufruf mit und ließ seine restlichen Kommandos stumm fallen. Der Fehler ist also doppelt teuer — er killt die Messung *und* die Shell, die ihn melden könnte.
+
+  **Setz den Kill in `try/finally` oder an `process.on('exit')`.** `proc.kill()` reapt die Renderer-Kinder zuverlässig, *wenn* die Zeile erreicht wird — endet der Run vorher (Timeout, Abbruch, Harness-Kill), bleibt der ganze Baum liegen und hält seinen Debug-Port. Am 2026-10-02 lagen in diesem geteilten Workspace **5 verwaiste Launcher-Bäume mit insgesamt 39 Chrome-Prozessen** (alle `PPID 1`, 16–19 h alt) und **14** übrig gebliebene Profilverzeichnisse. Sieh zu Beginn einmal nach fremden Bäumen, und zähle die Chrome-Prozesse vor und nach dem eigenen Lauf — das ist geteilter Speicher in einem Workspace, den mehrere Runs gleichzeitig halten.
+
+  **Scratch.** `PAPERCLIP_RUN_SCRATCH_DIR` liegt auf einem ~1,9 GB tmpfs, das sich alle parallelen Runs teilen: zwei gleichzeitige `npm ci` füllen es, und dann verliert *jeder* Bash-Aufruf seine Ausgabe, weil die Task-Output-Dateien der Harness dort ebenfalls liegen. Mess-Worktrees neben das Repo auf `/`, nicht ins tmpfs.
 
   **Screenshot ins Issue.** `POST /api/companies/{companyId}/issues/{issueId}/attachments` als Multipart mit Feldname `file` funktioniert — `201`, und die Antwort enthält einen `contentPath`:
 
@@ -248,7 +290,9 @@ Welche Reviews nötig sind, entscheidet Chief of Staff beim Zuweisen und schreib
 
 ### Beweislast im QA-Review
 
-**Wo die Tabelle oben den QA Auditor zieht, ruht sein Verdikt auf gemessenem Rendering — nicht auf gerechneter Geometrie.** Ein PASS ist nur mit Zahlen aus einem tatsächlich gerenderten Browser gültig; das Rezept dafür steht in **Runtime-Realität**, „Ein Headless-Chromium liegt im Agent-Image". Gerechnete Geometrie — etwa Advance-Widths direkt aus der WOFF-Datei, wie in [PRI-60](/PRI/issues/PRI-60) — bleibt als Quercheck erlaubt, ist allein aber **kein PASS mehr**. Lässt sich eine Frage nicht rendern, gehört der Grund als ausdrücklich benannte Lücke in das Review-Issue: eine Rendering-Lücke ist kein Normalzustand, sondern selbst ein Befund. Board-Entscheidung zu [PRI-61](/PRI/issues/PRI-61), umgesetzt in [PRI-142](/PRI/issues/PRI-142).
+**Wo die Tabelle oben den QA Auditor zieht, ruht sein Verdikt auf gemessenem Rendering — nicht auf gerechneter Geometrie.** Ein PASS ist nur mit Zahlen aus einem tatsächlich gerenderten Browser gültig; das Rezept dafür steht in **Runtime-Realität**, „Ein Headless-Chromium liegt im Agent-Image". Gerechnete Geometrie — etwa Advance-Widths direkt aus der WOFF-Datei, wie in [PRI-60](/PRI/issues/PRI-60) — bleibt als Quercheck erlaubt, ist allein aber **kein PASS mehr**. Lässt sich eine Frage nicht rendern, gehört der Grund als ausdrücklich benannte Lücke in das Review-Issue: eine Rendering-Lücke ist kein Normalzustand, sondern selbst ein Befund.
+
+**Welches Verdikt daraus folgt, ist festgelegt:** eine ausdrücklich benannte Rendering-Lücke macht das Verdikt zu einem **PASS mit Findings** — die Lücke ist dann selbst das Finding. Ein PASS ohne Zahlen **und** ohne benannte Lücke gibt es nicht. Damit ist die Lücke kein Grund, das Review zu blockieren oder nach Regel 12 ans Board zu eskalieren. Board-Entscheidung zu [PRI-61](/PRI/issues/PRI-61), umgesetzt in [PRI-142](/PRI/issues/PRI-142).
 
 Das ändert **nichts an der Auslöser-Tabelle oben** — welcher Auditor bei welchem Diff zieht, bleibt unverändert. Es geht ausschließlich um die Beweislast *innerhalb* eines QA-Reviews, das die Matrix ohnehin schon verlangt.
 
