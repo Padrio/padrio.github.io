@@ -1,9 +1,23 @@
 name: PR Build Check
 
 on:
-  # Läuft bei jedem Pull Request gegen main, bevor gemerged (und damit deployt) wird
+  # Läuft bei jedem Pull Request, bevor er gemerged wird — gegen main und gegen die
+  # Sammelbranches des Stacked-PR-Verfahrens (`stack/**`, Board-Freigabe 2026-10-02).
+  #
+  # `branches:` filtert den BASE-Branch des Pull-Requests, nicht den Head. Ohne den
+  # `stack/**`-Eintrag zieht ein Kind-PR gegen einen Stack-Branch diesen Workflow gar
+  # nicht: kein roter Check, sondern überhaupt keiner — und damit lautlos weder das
+  # Grep-Gate noch `npm run build`. Dieses Repo hat weder Tests noch Linter, das wäre
+  # der Verlust des einzigen Gates für jeden Kind-PR (PRI-158).
+  #
+  # Der Unterschied zwischen den beiden Basen: ein Merge in `main` deployt live
+  # (deploy.yml läuft bei jedem Push auf main), ein Merge in einen `stack/**`-Branch
+  # deployt nichts. Der Stack sammelt nur; live geht er erst mit dem Sammel-PR gegen
+  # main, der dann selbst wieder hier durchläuft.
   pull_request:
-    branches: [ main ]
+    branches:
+      - main
+      - 'stack/**'
 
 # Der Check liest nur den Code, er deployt nichts
 permissions:
