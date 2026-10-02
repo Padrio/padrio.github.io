@@ -15,7 +15,7 @@ Das Design-System heißt „Warm Minimalist“: heller Grund (`stone-50`), weiß
 ## Installation
 
 ```bash
-npm install
+npm ci
 ```
 
 ## Entwicklung
@@ -85,6 +85,8 @@ cwebp -q 80 input.png -o output.webp
 `-q 80` setzt die Qualität auf 80% (empfohlen für Projektbilder).
 
 ### Alle PNGs in einem Ordner umwandeln
+
+Die PNG-Quellen nach dem Umwandeln löschen und nicht committen.
 
 ```bash
 for file in public/images/projects/*.png; do
