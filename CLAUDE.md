@@ -171,6 +171,65 @@ Im Agent-Workspace verifiziert. Diese Punkte kosten sonst jeden Agent einen Fehl
   - **Die Committer-Zeile ist nicht setzbar.** Der Wrapper löscht `GIT_COMMITTER_*` aus der Kindprozess-Umgebung und belegt sie selbst. Umgehbar nur durch direkten Aufruf von `/usr/bin/git` — das ist ausdrücklich unerwünscht, weil ein Agent damit eine Laufzeitkontrolle über Commit-Attribution unterlaufen würde.
   - **Auf `main` überlebt der per `--author` gesetzte Author den Merge nicht.** Der Squash-Commit `d910a21` (aus `cb3262c`) und die Merge-Commits `277ad03`/`fd2ef58` tragen alle Author `Pascal Krason <3200139+Padrio@users.noreply.github.com>`: GitHub ersetzt beim Merge über UI/API den gesamten Author durch die Identität des mergenden Kontos — E-Mail ist dessen noreply-Adresse (E-Mail-Privacy), Name dessen Profilname. Dass der Name hier passt, liegt am Profilnamen des Kontos `Padrio` und nicht daran, dass der Branch-Commit ihn durchreicht; Nachweis: `ba92205` ist der Merge von `4950d29` (Author-Name `Padrio`) und trägt selbst den Author-Namen `Pascal Krason`. Regel 2 bindet also den **Branch-Commit**; was auf `main` landet, entscheidet GitHub. Nicht dagegen anarbeiten und die Differenz nicht als Fehler melden.
 - **Der Workspace kann parallel von mehreren Runs gehalten werden.** Nicht im gemeinsamen Checkout den Branch wechseln — mit `git worktree add` in einem eigenen Verzeichnis arbeiten und dort `npm ci` ausführen. `git rev-parse --abbrev-ref HEAD` darf nie `main` sein, während du arbeitest.
+- **Ein Headless-Chromium liegt im Agent-Image — Rendering ist messbar, nicht nur rechenbar.** Alle Angaben in diesem Punkt sind am 2026-10-02 im Agent-Workspace nachgemessen ([PRI-142](/PRI/issues/PRI-142)). Zwei Binaries unter `~/.cache/ms-playwright/`, beide Chrome for Testing `153.0.8010.12`:
+
+  ```bash
+  SHELL_BIN=~/.cache/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-linux64/chrome-headless-shell
+  FULL_BIN=~/.cache/ms-playwright/chromium-1243/chrome-linux64/chrome   # läuft auch, klemmt aber Viewports — siehe unten
+  ```
+
+  Kein `apt`, kein `npx playwright install`. Der Browser liegt **außerhalb des Repos**: `playwright`, `puppeteer` und `ws` sind nicht installiert und werden nicht gebraucht, `package.json` und `package-lock.json` bleiben unberührt — **Regel 8 ist davon nicht betroffen.** Node 24.21 hat hier ein globales `WebSocket`; ein vollständiger DevTools-Protocol-Client ist damit rund 40 Zeilen ohne jede Dependency.
+
+  **`--no-sandbox` ist Pflicht, bei beiden Binaries.** Ohne das Flag bricht der Prozess in unter 3 s ab — Exit 133 (`chrome-headless-shell`) bzw. 134 (`chrome`) — und schreibt `FATAL … No usable sandbox!` auf **stderr**; stdout bleibt leer. Wer nur stdout prüft, sieht nichts und hält den Workspace für browserlos. Mit dem Flag antworten beide sofort:
+
+  ```bash
+  "$SHELL_BIN" --headless --no-sandbox --disable-gpu --dump-dom "data:text/html,<p>hi</p>"
+  # <html><head></head><body><p>hi</p></body></html>
+  ```
+
+  **Für echte Messungen CDP statt `--dump-dom`.** Start mit `--remote-debugging-port=0` (kollidiert nicht mit parallelen Runs), die `ws://`-URL kommt von stderr, dann `Target.createTarget` → `Target.attachToTarget {flatten:true}` und jeder weitere Aufruf mit der `sessionId`:
+
+  ```js
+  const proc = spawn(SHELL_BIN, ['--headless', '--no-sandbox', '--disable-gpu',
+    '--remote-debugging-port=0', 'about:blank']);   // positionales about:blank: siehe unten
+  // ws://-URL aus proc.stderr lesen, dann:
+  const ws = new WebSocket(wsUrl);                  // global, kein Paket nötig
+  // Target.createTarget  {url:'about:blank'}        -> targetId
+  // Target.attachToTarget {targetId, flatten:true}  -> sessionId
+  // Page.enable / Runtime.enable mit {sessionId}, danach Runtime.evaluate
+  ```
+
+  Das positionale `about:blank` als letztes Argument ist nur dann nötig, wenn das Skript ein **vorhandenes** Page-Target aus `Target.getTargets` greift: ohne das Argument liefert `Target.getTargets` bei `chrome-headless-shell` eine **leere** Liste, das Skript stirbt an `Cannot read properties of undefined (reading 'targetId')` und das sieht wie ein CDP-Versionsproblem aus. `Target.createTarget` funktioniert dagegen in jedem Fall. Setz das Argument trotzdem — es kostet nichts und macht beide Wege gültig.
+
+  CDP kann, was `--dump-dom` nicht kann: `Runtime.evaluate` mit `awaitPromise` (Proben, die klicken, scrollen und warten), `Emulation.setDeviceMetricsOverride` für echte Viewports, `Emulation.setEmulatedMedia` für `prefers-reduced-motion` pro Target, `Runtime.exceptionThrown` für echte Konsolenfehler, `Page.captureScreenshot` mit `clip`.
+
+  **Viewports über `Emulation.setDeviceMetricsOverride`, nicht über `--window-size`.** Standardsatz: **320, 390, 768, 1280 px.** 320 ist die schmalste real relevante Breite und die, bei der dieses Projekt wiederholt Overflow hatte ([PRI-84](/PRI/issues/PRI-84)); 390 das iPhone-Maß; 768 der `sm:`-Bereich oberhalb des 640-px-Breakpoints; 1280 der Desktop-Stand. Abweichungen sind erlaubt, müssen aber im Review benannt werden. Zwei Fallen:
+
+  - `--window-size=320,800` wird vom vollständigen `chrome` auf `innerWidth 500` geklemmt; `chrome-headless-shell` liefert dort 320. Verlass dich auf keines von beidem.
+  - `setDeviceMetricsOverride {width:320, mobile:true}` ergibt auf einer Seite **ohne** `<meta name="viewport">` `innerWidth 980` statt 320 — das ist Chromes Mobile-Fallback-Layoutbreite, keine Messung. Die ausgelieferten Seiten tragen das Meta-Tag und messen exakt; eine selbstgebaute Probe-Seite braucht es ebenfalls, sonst `mobile:false` setzen. **Prüfe `innerWidth` immer als Zusicherung gegen die angeforderte Breite.**
+
+  **Für eine Frage zum ausgelieferten Zustand direkt `https://pkrason.de` messen.** Der Runner hat Netzzugang; `Page.navigate` auf die Live-URLs kostet keinen Worktree, kein `npm ci` und keinen lokalen Server, Seitenliste aus `https://pkrason.de/sitemap-0.xml`. Zwei Bedingungen: nur gültig, wenn der Live-Stand der gemeinte Commit ist, und für einen Baseline-gegen-Branch-Vergleich untauglich.
+
+  **Für einen Vergleich die Baseline immer mitbauen.** `origin/main` in einen zweiten Worktree, `node_modules` per `cp -r` statt eines zweiten `npm ci`, sequenziell bauen. **Baseline gegen Baseline muss 0 Unterschiede ergeben, bevor ein Delta etwas bedeutet.** Ein lokaler Server genügt als `python3 -m http.server <port> --bind 127.0.0.1 --directory dist`; das ist auf dem hier installierten Python 3.14 ein `ThreadingHTTPServer`, eine Seite mit `<iframe>` lädt damit in ~0,6 s.
+
+  **Scroll-Animation ist die größte Quelle erfundener Findings.** `html` trägt `scroll-behavior: smooth`, und alles, was während eines laufenden Scrolls gemessen wird, ist Rauschen und sieht genau wie ein Befund aus. Gemessen auf der Startseite: Klick auf den ersten In-Page-Anchor und `scrollY` direkt danach gelesen ergibt **0**, nach drei stabilen Frames **65**. Zwei Maßnahmen, beide nötig — `*{scroll-behavior:auto !important}` injizieren (danach steht der Wert sofort auf 65) und per `requestAnimationFrame` warten, bis `scrollY` drei Frames konstant ist. Dazu eine Messreihe nehmen und auf Konstanz prüfen, bevor man sie diffed.
+
+  **Zwei Messfallen, die ein falsches Ergebnis plausibel aussehen lassen:**
+
+  - *Welche Schrift gerendert hat, entscheidet die Zahl.* Vor jeder Breitenaussage `await document.fonts.ready` abwarten und `document.fonts.check('400 16px "JetBrains Mono"')` prüfen. Gemessen auf der Live-Seite bei `font-size: 16px`: mit geladenem JetBrains Mono 10,00 px Advance pro Zeichen, mit `ui-monospace` 9,60 px. Eine still zurückgefallene Messung liegt also nur 4 % daneben und fällt von selbst nicht auf.
+  - *Farben kommen unter Tailwind 4 als rohes `oklch(…)` aus `getComputedStyle`.* Ein `match(/[\d.]+/g)`-Parser liest L/C/H als R/G/B und liefert Unsinn, der wie eine Zahl aussieht — für `stone-500` auf `stone-50` 602,6 statt 4,58. Über ein 1×1-Canvas auflösen und dabei **komponieren**: erst den Hintergrund füllen, dann die Farbe darüber, sonst wird jede Transparenz zu Schwarz.
+
+  **Aufräumen und Scratch.** Chrome über die aufgezeichnete PID beenden, **niemals über `pkill -f <muster>`** — das Muster matcht die eigene Shell (geprüft: `/proc/$$/cmdline` der Agent-Shell enthält das Muster, `pgrep -f` listet die eigene PID) und beendet sie mit Exit 144 ohne jede Ausgabe. Und `PAPERCLIP_RUN_SCRATCH_DIR` liegt auf einem ~1,9 GB tmpfs, das sich alle parallelen Runs teilen: zwei gleichzeitige `npm ci` füllen es, und dann verliert *jeder* Bash-Aufruf seine Ausgabe, weil die Task-Output-Dateien der Harness dort ebenfalls liegen. Mess-Worktrees neben das Repo auf `/`, nicht ins tmpfs.
+
+  **Screenshot ins Issue.** `POST /api/companies/{companyId}/issues/{issueId}/attachments` als Multipart mit Feldname `file` funktioniert — `201`, und die Antwort enthält einen `contentPath`:
+
+  ```bash
+  API="${PAPERCLIP_API_URL%/}"; API="${API%/api}"
+  curl -s -X POST -H "Authorization: Bearer $PAPERCLIP_API_KEY" \
+    -H "X-Paperclip-Run-Id: $PAPERCLIP_RUN_ID" \
+    -F "file=@shot.png;type=image/png" \
+    "$API/api/companies/$PAPERCLIP_COMPANY_ID/issues/$PAPERCLIP_TASK_ID/attachments"
+  ```
 
 ---
 
@@ -186,6 +245,14 @@ Wer ein PR reviewen muss, hängt davon ab, was der Diff berührt. Der companywei
 | Nur Dokumentation, Frontmatter oder Projekttext ohne Darstellungsänderung | **Code Auditor** allein |
 
 Welche Reviews nötig sind, entscheidet Chief of Staff beim Zuweisen und schreibt es in das Issue. Nennt das Issue nur den Code Auditor, ist genau ein Review korrekt — melde das nicht als Abweichung. Hältst du ein zusätzliches Review für nötig, das im Issue nicht steht: Kommentar an Chief of Staff, nicht eigenmächtig weglassen oder hinzufügen.
+
+### Beweislast im QA-Review
+
+**Wo die Tabelle oben den QA Auditor zieht, ruht sein Verdikt auf gemessenem Rendering — nicht auf gerechneter Geometrie.** Ein PASS ist nur mit Zahlen aus einem tatsächlich gerenderten Browser gültig; das Rezept dafür steht in **Runtime-Realität**, „Ein Headless-Chromium liegt im Agent-Image". Gerechnete Geometrie — etwa Advance-Widths direkt aus der WOFF-Datei, wie in [PRI-60](/PRI/issues/PRI-60) — bleibt als Quercheck erlaubt, ist allein aber **kein PASS mehr**. Lässt sich eine Frage nicht rendern, gehört der Grund als ausdrücklich benannte Lücke in das Review-Issue: eine Rendering-Lücke ist kein Normalzustand, sondern selbst ein Befund. Board-Entscheidung zu [PRI-61](/PRI/issues/PRI-61), umgesetzt in [PRI-142](/PRI/issues/PRI-142).
+
+Das ändert **nichts an der Auslöser-Tabelle oben** — welcher Auditor bei welchem Diff zieht, bleibt unverändert. Es geht ausschließlich um die Beweislast *innerhalb* eines QA-Reviews, das die Matrix ohnehin schon verlangt.
+
+**Evidenzformat.** Messwerte als Tabelle in den Review-Kommentar: Element, Viewport, gemessener Wert, Soll. Screenshots gehen per Attachment-Upload an das Review-Issue (Pfad in **Runtime-Realität**); ein Screenshot ersetzt die Zahlen nicht, er belegt sie.
 
 ---
 
