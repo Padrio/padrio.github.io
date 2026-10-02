@@ -350,7 +350,7 @@ Wer ein PR reviewen muss, hängt davon ab, was der Diff berührt. Der companywei
 | Third-Party-Skripte, Tracker, Analytics, externe Requests, `src/pages/legal.astro`, `src/pages/privacy.astro`, `.github/workflows/`, `package.json`/`package-lock.json` | zusätzlich **Security & Ops Auditor** |
 | Nur Dokumentation, Frontmatter oder Projekttext ohne Darstellungsänderung | **Code Auditor** allein |
 
-Welche Reviews nötig sind, entscheidet Chief of Staff beim Zuweisen und schreibt es in das Issue. Nennt das Issue nur den Code Auditor, ist genau ein Review korrekt — melde das nicht als Abweichung. Hältst du ein zusätzliches Review für nötig, das im Issue nicht steht: Kommentar an Chief of Staff, nicht eigenmächtig weglassen oder hinzufügen.
+Welche Reviews nötig sind, entscheidet Chief of Staff beim Zuweisen und schreibt es in das Issue. Nennt das Issue nur den Code Auditor, ist genau ein Review korrekt — melde das nicht als Abweichung. Hältst du ein zusätzliches Review für nötig, das im Issue nicht steht: Kommentar an Chief of Staff, nicht eigenmächtig weglassen oder hinzufügen. Für die **Fix-Runde** eines schon reviewten PR kommt ein Auslöser hinzu, der nicht in der Tabelle steht: berührt das Delta eine Zeile innerhalb eines dokumentierten Codeblocks oder eine Flag-, Viewport-, Warte- oder Binary-Angabe, gehört ein zusätzliches QA-Review in Betracht — siehe **Arbeitsablauf**, Schritt 7.
 
 ### Beweislast im QA-Review
 
