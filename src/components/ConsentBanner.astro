@@ -124,23 +124,36 @@
       reserveSpace();
       resize.observe(banner);
     }
+    // A decision taken in this document counts even when `setItem` threw and
+    // nothing was stored — otherwise the banner would stay up after "Allow".
+    let answered = false;
+
     // Also covers the revoke button on /privacy/ and a decision taken in
     // another tab, both of which record a decision while this banner is still
     // on screen.
-    onDecisionChange(() => {
-      // Order is load-bearing. Hiding the banner makes the observer queue a
-      // 0×0 record; only because `disconnect()` runs in the same task is that
-      // record dropped before `reserveSpace` could write `0px`. Swap
-      // `disconnect()` and `releaseSpace()` and `padding-bottom: 0px` stays
-      // behind as an inline style instead of being cleared.
+    onDecisionChange((decision) => {
+      // An emptied store is not an answer: the other tab cleared the decision,
+      // so the question stands and the banner has to stay. Only this consumer
+      // can tell the difference, which is why the broadcast no longer tries.
+      if (decision === null && !answered) return;
+      // `disconnect()` has to run in the same task as the hiding. Hiding makes
+      // the observer queue a 0×0 record; `disconnect()` empties the queue
+      // before it is delivered. Drop it, or move it into a later task (into
+      // `releaseSpace()`, a `requestAnimationFrame`), and `reserveSpace` writes
+      // `padding-bottom: 0px` back as an inline style — measured. The order of
+      // `disconnect()` and `releaseSpace()` relative to each other is free.
       banner.hidden = true;
       resize.disconnect();
       releaseSpace();
     });
+    // `answered` before the call, because `storeDecision` dispatches
+    // synchronously and the handler above reads the flag.
     document.getElementById('consent-allow')?.addEventListener('click', () => {
+      answered = true;
       grantConsent();
     });
     document.getElementById('consent-decline')?.addEventListener('click', () => {
+      answered = true;
       denyConsent();
     });
   }

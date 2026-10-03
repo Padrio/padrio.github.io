@@ -163,6 +163,8 @@ export function denyConsent() {
   });
 }
 
+let watching = false;
+
 /**
  * Propagates a decision made in another tab into this one.
  *
@@ -184,11 +186,10 @@ export function denyConsent() {
  * The spec excludes the writing tab from delivery, so the tab the visitor
  * clicked in does not run any of this a second time. A browser that delivers to
  * the writer regardless (old WebKit) would get a harmless second reload on the
- * revoke path — but on the banner path a reload that "Decline" deliberately
- * does not do.
+ * revoke path. The banner path is not affected: the reload branch also requires
+ * `isClarityLoaded()`, and a "Decline" taken straight from the banner never
+ * loaded Clarity — every path that does load it hides the banner first.
  */
-let watching = false;
-
 export function watchOtherTabs() {
   // Registration is guaranteed once per document by ConsentBanner rendering
   // once, but a second listener would mean two reloads, so it does not hang on
@@ -204,23 +205,26 @@ export function watchOtherTabs() {
     } catch {
       return;
     }
-    if (readDecision() !== GRANTED && isClarityLoaded()) {
+    // One read for all three branches below: they run in the same task and have
+    // to agree on what the other tab left behind.
+    const decision = readDecision();
+    if (decision !== GRANTED && isClarityLoaded()) {
       clearClarityStorage();
       window.location.reload();
       return;
     }
-    // Past the reload branch, a null decision means the other tab emptied the
-    // store: there is nothing to propagate. Returning is what keeps a visible
-    // banner up — the change event hides it unconditionally, which would strand
-    // the visitor on a page that neither tracks nor asks.
-    if (readDecision() === null) return;
     // A grant has to take effect here before it is announced, or the status
     // line on /privacy/ reports a tracker this document never loaded. Same
     // rule as `grantConsent`: nothing is announced before it is true. The
     // decision is the same person's explicit action and is already stored, so
     // this only brings the document forward to what its next navigation would
     // do anyway.
-    if (readDecision() === GRANTED) loadClarity();
+    if (decision === GRANTED) loadClarity();
+    // Announced unconditionally, an emptied store included. What a null
+    // decision means is the consumer's call, not this broadcast's: the banner
+    // stays up because there is still nothing to go on (see ConsentBanner), and
+    // the status line on /privacy/ returns to its "not asked yet" wording —
+    // which it cannot do if the event never arrives.
     document.dispatchEvent(new CustomEvent(CHANGE_EVENT));
   });
 }

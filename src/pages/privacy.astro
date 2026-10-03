@@ -279,11 +279,14 @@ import Layout from '../layouts/Layout.astro';
       'Microsoft Clarity is switched off. No data is being sent and the Clarity cookies have been deleted.',
     // localStorage can be cleared at any time, so "no decision" needs its own
     // wording — showing "active" or nothing at all would misinform. It is read
-    // back out of the markup instead of repeated here, so the server-rendered
-    // default and this script can never drift apart. The literal is the
-    // fallback for an empty read only: rewriting or removing the paragraph
-    // above would otherwise turn this state into a silent empty line, with no
-    // build error and nothing in the console to notice it by.
+    // back out of the markup instead of repeated here, so a visitor can never
+    // be shown two different texts for the same state. The literal is the
+    // fallback for an empty read only: *removing* the paragraph above would
+    // otherwise turn this state into a silent empty line, with no build error
+    // and nothing in the console to notice it by. Rewriting it is the case the
+    // fallback does not catch — the script would just show the new text and
+    // this literal would go stale unnoticed, because nothing but the empty read
+    // ever displays it. Keep it word-for-word identical with the paragraph.
     none:
       stateLine?.textContent?.trim() ||
       'You have not been asked yet, or you cleared your choice. Microsoft Clarity is switched off.',
