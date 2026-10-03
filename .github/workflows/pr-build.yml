@@ -92,7 +92,7 @@ jobs:
 
           findings=""
           checked=0
-          checked_labels=""
+          checked_records=""
 
           # $1 = Muster, wie es im Log erscheint · $2 = ERE · $3 = die richtige Ersetzung
           # $4 = optional: GENAU EINE Datei, die für dieses Muster übersprungen wird.
@@ -114,17 +114,39 @@ jobs:
             # immer eine nichtnegative Dezimalzahl und nach oben durch ARG_MAX begrenzt.
             # "test ... -gt" kann hier also nicht mit Status 2 abbrechen, und ein Status 2
             # wäre in einer if-Bedingung stillschweigend "falsch" (errexit greift dort
-            # nicht). Bei expected_patterns weiter unten ist das anders — das ist eine von
-            # Hand gepflegte Konstante, deshalb steht dort "!=" statt "-ne"; Begründung
-            # dort bei der Zahlenprüfung.
+            # nicht). Eine von Hand gepflegte ZAHL gibt es in diesem Schritt seit dem
+            # Manifest (PRI-107) nicht mehr: die Musterliste wird als Zeichenkette
+            # verglichen, nicht als Anzahl.
             if [ "$#" -gt 4 ]; then
               echo "scan(): $# Argumente für das Muster \"${label}\" — gebunden werden nur vier."
               echo "Ein zweites Skip-Argument hat keine Wirkung; dafür müsste scan() erweitert"
               echo "werden. Das Gate lehnt ab, statt den Aufruf still halb auszuführen."
               exit 1
             fi
+            # Der Datensatz, den das Manifest unten vergleicht: die vollständige
+            # Argumentliste dieses Aufrufs außer der ERE, als "Muster|Ersetzung|Skip".
+            # Das Skip MUSS mit hinein (PRI-105 S-1): ein nachträglich angehängtes
+            # viertes Argument nimmt einem Muster lautlos die Deckung in genau einer
+            # Datei — praktisch in der Datei, in die man die Regression schreiben will —,
+            # und an der ANZAHL der Aufrufe ist davon nichts zu sehen. Die ERE bleibt
+            # bewusst draußen; welche Lücke das offen lässt, steht unten am Manifest.
+            #
+            # Enthielte ein Argument selbst ein "|" oder einen Zeilenumbruch, wären zwei
+            # verschiedene Argumentlisten als Datensatz nicht mehr unterscheidbar bzw.
+            # ein Datensatz nicht mehr genau eine Zeile — der Vergleich wäre dort blind.
+            # Heute hat kein Argument eines von beidem; käme eines dazu, lehnt das Gate
+            # ab, statt die Deckung still zu verlieren.
+            case "${label}${fix}${skip}" in
+              *'|'*|*$'\n'*)
+                echo "Argument mit \"|\" oder Zeilenumbruch beim Muster \"${label}\" — das"
+                echo "Manifest unten trennt seine Felder mit \"|\" und hält je Aufruf genau eine"
+                echo "Zeile. Das Gate lehnt ab, statt einen nicht eindeutigen Datensatz zu"
+                echo "vergleichen."
+                exit 1
+                ;;
+            esac
             checked=$((checked + 1))
-            checked_labels="${checked_labels}${label}"$'\n'
+            checked_records="${checked_records}${label}|${fix}|${skip}"$'\n'
             out=$(grep -rnaE -- "$re" src/) && rc=0 || rc=$?
             if [ "$rc" -gt 1 ]; then
               echo "grep brach beim Muster \"${label}\" mit Status ${rc} ab. Das Gate kann nicht"
@@ -254,8 +276,9 @@ jobs:
           # Überschneidungsfrei zu den Präfix-Mustern, gemessen: "flex-grow-0" hat rechts
           # von "flex-grow" keine Tokengrenze und löst deshalb nur das Präfix-Muster aus;
           # "flex-grow" hat keinen Bindestrich und löst nur dieses hier aus. Je genau ein
-          # Fund, nie zwei. Die Labels unterscheiden sich ("flex-grow" vs. "flex-grow-"),
-          # der Doppel-Check weiter unten schlägt also nicht an.
+          # Fund, nie zwei. Die Datensätze unterscheiden sich ("flex-grow|grow|" gegen
+          # "flex-grow-|grow-|"), das Manifest unten verlangt deshalb beide Zeilen und
+          # hält keine davon für eine Dopplung der anderen.
           # Fehlalarm-Fläche, gemessen (PRI-113 S-1): beide Muster schlagen auch an, wenn
           # flex-grow/flex-shrink als CSS-WERT stehen — "transition: flex-grow 0.2s;" und
           # "will-change: flex-shrink;" treffen, und die gemeldete Ersetzung ist dort
@@ -296,8 +319,10 @@ jobs:
           # Hinweis darauf, dass das Konstrukt nicht funktioniert hat. Eine VERBATIM
           # duplizierte Zeile ist ebenfalls rot, aber über einen anderen Guard: solange
           # irgendeine ungeskippte Prosa-Stelle offen ist, über die Fundstellen-Meldung,
-          # sonst über die Zahlenprüfung (expected_patterns nicht mitgezogen) bzw. den
-          # Doppel-Check (mitgezogen). Alle sechs Varianten gemessen, PRI-80 Runde 6.
+          # sonst über den Manifest-Vergleich unten — die Kopie läuft als zusätzliche
+          # Vielfachheit mit und steht so nicht im Manifest (in PRI-107 für die verbatim
+          # duplizierte Zeile nachgemessen). Alle sechs Varianten sind in PRI-80 Runde 6
+          # gegen die damalige Zahlenprüfung gemessen, nicht gegen das Manifest.
           # Zwei Skip-Dateien brauchen also zuerst eine Erweiterung von scan()
           # auf eine Liste — das ist eine Änderung an der Gate-Mechanik und zieht nach
           # der Review-Matrix den Security & Ops Auditor.
@@ -307,12 +332,70 @@ jobs:
           token  "ring"                  "ring-3 für die alte Optik, oder bewusst ring-1"  "src/styles/global.css"
           token  "outline-none"          "outline-hidden"
 
-          # Soll-Zahl der Muster, bewusst direkt unter der Liste und nicht oben bei
-          # checked=0: wer eine Zeile aus der Liste entfernt, sieht die Konstante im
-          # selben Diff-Hunk. Geprüft wird sie weiter unten, auf dem grünen Pfad —
-          # ein echter Fund soll zuerst im Log stehen und nicht von dieser Meldung
-          # verdeckt werden.
-          expected_patterns=20
+          # ---------------------------------------------------------------------------
+          # DAS MANIFEST: dieselben Aufrufe wie oben als Literal, je Zeile
+          # "Muster|Ersetzung|Skip-Datei" (leeres drittes Feld = kein Skip). Es steht
+          # bewusst direkt unter der Liste und nicht oben bei checked=0: wer eine Zeile
+          # der Liste anfasst, sieht das Manifest im selben Diff-Hunk. Verglichen wird es
+          # weiter unten, auf dem grünen Pfad — ein echter Fund soll zuerst im Log stehen
+          # und nicht von dieser Meldung verdeckt werden.
+          #
+          # WAS ES FÄNGT: die gelaufene Aufrufliste gegen dieses Literal, beide Seiten
+          # sortiert und mit Vielfachheit, als Zeichenkette. Das ist EINE Prüfung für
+          # sechs Fehlerbilder, für die es vorher zwei brauchte — und drei davon gingen
+          # durch beide hindurch:
+          #   - Zeile entfernt    (vorher rot über die Zahlenprüfung)
+          #   - Zeile ergänzt     (vorher rot über die Zahlenprüfung)
+          #   - Zeile gedoppelt   (vorher rot über den Doppel-Check)
+          #   - Zeile UMBENANNT   (vorher STILL GRÜN: blur-sm -> blur-md ließ checked bei
+          #                        20 und alle Labels eindeutig, das verdrängte Muster
+          #                        war ungeprüft)
+          #   - Label VERTIPPT    (vorher STILL GRÜN: shadow-smm, dito)
+          #   - Skip angehängt oder umgebogen (vorher STILL GRÜN, PRI-105 S-1: ein
+          #                        viertes Argument ist die legitime Aufrufform und
+          #                        ändert weder Anzahl noch Eindeutigkeit)
+          # Bei token/prefix kann das Muster nicht vom Label abweichen — beide leiten
+          # sich aus demselben "$1" ab —, ein vertipptes Label ist dort also immer auch
+          # ein vertipptes Muster und wird hier gefangen.
+          #
+          # WAS ES NICHT FÄNGT, bewusst in Kauf genommen (CEO-Entscheidung PRI-106):
+          # einen Vertipper ALLEIN IN DER ERE der einzigen echten scan-Zeile
+          # (scan "theme(" "theme\(" …). Nur dort sind Muster und ERE zwei getrennte
+          # Argumente und können auseinanderlaufen. Die ERE steht bewusst nicht im
+          # Datensatz: bei den 19 token/prefix-Zeilen schleppte sie die LB/RB-Konstanten
+          # mit, und jede Änderung an der Matching-Semantik müsste dann 19 Manifestzeilen
+          # anfassen. Ein Hash über die Datensätze (die verworfene Variante B) hätte
+          # dieselbe Lücke gehabt und könnte zusätzlich nicht sagen, WELCHE Zeile falsch
+          # ist.
+          #
+          # DER PREIS: die Liste steht jetzt zweimal in dieser Datei. Eine bewusste
+          # Listenänderung ist an BEIDEN Stellen nachzuziehen. Ein vergessener Nachzug
+          # ist rot, nicht still grün — das ist die Richtung, in der dieser Fehler
+          # passieren darf. Kein Padding und keine Leerzeichen zur Ausrichtung:
+          # verglichen werden Bytes.
+          # ---------------------------------------------------------------------------
+          pattern_manifest=(
+            'shadow-sm|shadow-xs|'
+            'rounded-sm|rounded-xs|'
+            'blur-sm|blur-xs|'
+            'drop-shadow-sm|drop-shadow-xs|'
+            'theme(|CSS-Variable direkt, z. B. var(--color-…)|'
+            'bg-opacity-|Slash-Syntax, z. B. bg-stone-900/50|'
+            'text-opacity-|Slash-Syntax, z. B. text-stone-900/50|'
+            'border-opacity-|Slash-Syntax, z. B. border-stone-900/50|'
+            'ring-opacity-|Slash-Syntax, z. B. ring-stone-900/50|'
+            'divide-opacity-|Slash-Syntax, z. B. divide-stone-900/50|'
+            'placeholder-opacity-|Slash-Syntax, z. B. placeholder-stone-900/50|'
+            'flex-shrink-|shrink-|'
+            'flex-grow-|grow-|'
+            'flex-shrink|shrink|'
+            'flex-grow|grow|'
+            'overflow-ellipsis|text-ellipsis|'
+            'decoration-slice|box-decoration-slice|'
+            'decoration-clone|box-decoration-clone|'
+            'ring|ring-3 für die alte Optik, oder bewusst ring-1|src/styles/global.css'
+            'outline-none|outline-hidden|'
+          )
 
           if [ -n "$findings" ]; then
             echo "Tailwind-3-Idiome in src/ gefunden — dieser PR wird abgelehnt."
@@ -326,70 +409,107 @@ jobs:
             exit 1
           fi
 
-          # Ohne diese Abfrage wird $checked gemeldet, aber nie geprüft — fällt eine
-          # token/prefix/scan-Zeile aus der Liste weg (Tippfehler, verunglückter Merge,
+          # Ohne diese Prüfung wird die Musterliste nur AUSGEFÜHRT und nie nachgewiesen.
+          # Fällt eine token/prefix/scan-Zeile weg (Tippfehler, verunglückter Merge,
           # Rebase-Konflikt in diesem Block), meldete das Gate zufrieden "19 Muster
           # geprüft" und ginge grün. Niemand liest 19 gegen 20, solange nichts danach
-          # fragt. Das ist dieselbe Fehlerklasse, gegen die dieses Gate gebaut ist:
-          # eine plausible Erfolgsmeldung über einem nicht erfolgten Scan (PRI-92 F-A).
-          # Eine Listenänderung zieht expected_patterns mit; ein vergessener Bump ist
-          # rot, nicht still grün.
+          # fragt. Das ist dieselbe Fehlerklasse, gegen die dieses Gate gebaut ist: eine
+          # plausible Erfolgsmeldung über einem nicht erfolgten Scan (PRI-92 F-A).
           #
-          # Ein ARITHMETISCHER Vergleich wäre hier selbst ein stilles No-Op: `test`
-          # bricht bei einem Nicht-Integer mit Status 2 ab statt mit 0 oder 1, die
-          # Bedingung eines `if` ist von errexit ausgenommen, und dort gilt Status 2
-          # schlicht als "falsch" — die Prüfung entfiel, das Gate lief in die
-          # Erfolgsmeldung (PRI-96 Finding 1, PRI-97 F-1). Deshalb zwei Dinge:
-          #   1. der case-Guard prüft den Wert, bevor er verglichen wird. Er fängt die
-          #      realistischen Verunglückungen an einer von Hand gepflegten Konstante
-          #      (leer, "l8", "18x"); die ganz gelöschte Zeile ist ohnehin harmlos,
-          #      set -u tötet die Shell hart.
-          #   2. der Vergleich selbst ist ein STRING-Vergleich ("!=", nicht "-ne").
-          #      Ein case-Guard auf die Zeichenklasse allein reichte nicht: `test -ne`
-          #      bricht auch bei einer reinen Ziffernfolge über INTMAX_MAX mit Status 2
-          #      ab, und 9223372036854775808 passiert ''|*[!0-9]* (PRI-99 F-1,
-          #      PRI-100 S-1). "!=" kann nicht mit Status 2 abbrechen und schließt die
-          #      Klasse damit ganz, statt nur ihre wahrscheinlichen Fälle.
-          # Beide Operanden sind an dieser Stelle reine Dezimalziffernfolgen — $checked
-          # kommt aus $((checked + 1)) —, der String-Vergleich ist hier also gleich
-          # bedeutend. Nebeneffekt, gewollt: eine führende Null ("018") ist jetzt rot.
-          # Eine beschädigte Konstante soll ablehnen.
-          case $expected_patterns in
-            ''|*[!0-9]*)
-              echo "expected_patterns ist keine Zahl (\"${expected_patterns}\") — die Konstante in"
-              echo "dieser Datei ist beschädigt. Das Gate kann nicht prüfen, ob die Musterliste"
-              echo "vollständig ist, und lehnt deshalb ab."
-              exit 1
-              ;;
-          esac
-          if [ "$checked" != "$expected_patterns" ]; then
-            echo "Das Gate hat ${checked} statt ${expected_patterns} Muster geprüft — die Liste"
-            echo "stimmt nicht mit expected_patterns überein. Wurde ein Muster absichtlich"
-            echo "entfernt oder ergänzt, ist expected_patterns in dieser Datei mitzuziehen (eine"
-            echo "Listenänderung zieht nach der Review-Matrix in CLAUDE.md den Security & Ops"
-            echo "Auditor)."
+          # Verglichen wird als ZEICHENKETTE — beide Seiten durch "sort | uniq -c", dann
+          # "!=". Kein arithmetischer Vergleich und keine von Hand gepflegte Zahl mehr.
+          # Damit ist die test-Status-2-Klasse hier strukturell erledigt und nicht nur
+          # abgedeckt: "test -ne" bricht bei einem Nicht-Integer UND bei einer reinen
+          # Ziffernfolge über INTMAX_MAX mit Status 2 ab, und in der Bedingung eines "if"
+          # gilt Status 2 schlicht als "falsch" — die Prüfung entfiel dann lautlos
+          # (PRI-96 F-1, PRI-97 F-1, PRI-99 F-1, PRI-100 S-1). An dieser Konstruktion
+          # gibt es nichts mehr, das so abbrechen könnte. Auch die Status-Abfragen unten
+          # vergleichen Zeichenketten ("!=" gegen 0) bzw. gehen über "case": "$?" ist
+          # immer eine kleine Dezimalzahl, der Stringvergleich ist hier gleichbedeutend
+          # und kann selbst nicht mit Status 2 enden.
+          #
+          # Die Vielfachheit ("uniq -c", nicht "uniq") muss mit in den Vergleich: eine
+          # zusätzlich eingefügte KOPIE einer Listenzeile wäre als reine Mengendifferenz
+          # unsichtbar. Dass beide Seiten durch dasselbe sort/uniq laufen, macht den
+          # Vergleich unabhängig von Sortierreihenfolge, Locale und Zählerformatierung —
+          # eine Abweichung dort trifft beide Seiten gleich.
+          ran=$(printf '%s' "$checked_records" | sort | uniq -c) && ran_rc=0 || ran_rc=$?
+          if [ "$ran_rc" != 0 ]; then
+            echo "Die gelaufene Musterliste ließ sich nicht sortieren und zählen (Status"
+            echo "${ran_rc}, Details auf stderr). Das Gate kann sie nicht gegen das Manifest"
+            echo "in dieser Datei prüfen und lehnt deshalb ab, statt unter dem errexit des"
+            echo "Runners ohne Meldung zu enden."
+            exit 1
+          fi
+          want=$(printf '%s\n' "${pattern_manifest[@]}" | sort | uniq -c) && want_rc=0 || want_rc=$?
+          if [ "$want_rc" != 0 ]; then
+            echo "Das Manifest in dieser Datei ließ sich nicht sortieren und zählen (Status"
+            echo "${want_rc}, Details auf stderr). Das Gate kann die gelaufene Musterliste"
+            echo "nicht dagegen prüfen und lehnt deshalb ab."
             exit 1
           fi
 
-          # Eine Zahl erkennt eine geschrumpfte Liste, keine ersetzte: wird eine Zeile
-          # durch die Kopie einer anderen überschrieben — ein Merge, der denselben Hunk
-          # zweimal anwendet —, bleibt checked bei 20, und das verdrängte Muster ist
-          # ungeprüft. Wieder dieselbe Fehlerklasse (PRI-96 Finding 2), deshalb hier
-          # dieselbe Konsequenz.
-          dupes=$(printf '%s' "$checked_labels" | sort | uniq -d) && dupe_rc=0 || dupe_rc=$?
-          if [ "$dupe_rc" -ne 0 ]; then
-            echo "Die Musterliste konnte nicht auf Doppel geprüft werden (Status ${dupe_rc}),"
-            echo "das Gate lehnt deshalb ab."
-            exit 1
-          fi
-          if [ -n "$dupes" ]; then
-            echo "Doppelte Muster in der Musterliste — ein Muster wurde überschrieben statt"
-            echo "ergänzt, und das verdrängte ist damit ungeprüft:"
-            printf '%s\n' "$dupes"
+          # Mengendifferenz über die gezählten Zeilen, damit die Meldung sagt, WELCHE
+          # Zeilen auseinanderlaufen, und nicht nur, dass sie es tun. Die leere Seite
+          # muss vor grep abgefangen werden: "grep -vxF -- ''" ist ein Muster auf die
+          # LEERE Zeile und nicht "kein Muster" — ohne die ersten zwei Zeilen meldete
+          # eine komplett leere gelaufene Liste eine Differenz von einer Leerzeile.
+          only_in() {
+            if [ -z "$1" ]; then return 0; fi
+            if [ -z "$2" ]; then printf '%s\n' "$1"; return 0; fi
+            printf '%s\n' "$1" | grep -vxF -- "$2"
+          }
+
+          if [ "$ran" != "$want" ]; then
+            echo "Die gelaufene Musterliste stimmt nicht mit dem Manifest in dieser Datei"
+            echo "überein — mindestens ein Muster ist damit ungeprüft, während das Gate sonst"
+            echo "\"nichts gefunden\" gemeldet hätte."
+            diff_broken=no
+            only_ran=$(only_in "$ran" "$want") && ran_only_rc=0 || ran_only_rc=$?
+            only_want=$(only_in "$want" "$ran") && want_only_rc=0 || want_only_rc=$?
+            # grep: 0 = Zeilen ausgegeben, 1 = keine, >= 2 Fehler.
+            case $ran_only_rc in 0|1) ;; *) diff_broken=yes ;; esac
+            case $want_only_rc in 0|1) ;; *) diff_broken=yes ;; esac
+            if [ "$diff_broken" = no ] && { [ -n "$only_ran" ] || [ -n "$only_want" ]; }; then
+              if [ -n "$only_ran" ]; then
+                echo ""
+                echo "nur gelaufen, nicht im Manifest — ergänzt, umbenannt, vertippt, gedoppelt"
+                echo "oder mit einem Skip versehen:"
+                printf '%s\n' "$only_ran"
+              fi
+              if [ -n "$only_want" ]; then
+                echo ""
+                echo "nur im Manifest, nicht gelaufen — entfernt, umbenannt oder von einer Kopie"
+                echo "verdrängt:"
+                printf '%s\n' "$only_want"
+              fi
+            else
+              # Entweder hat grep selbst versagt, oder beide Differenzen sind leer,
+              # obwohl die Listen sich unterscheiden (nach Konstruktion unmöglich,
+              # deshalb hier mit Status und beiden Listen statt mit einer Behauptung).
+              echo ""
+              echo "Welche Zeilen auseinanderlaufen, ließ sich nicht bestimmen (grep-Status"
+              echo "${ran_only_rc} bzw. ${want_only_rc}). Deshalb beide Listen vollständig:"
+              echo ""
+              echo "gelaufen:"
+              printf '%s\n' "$ran"
+              echo ""
+              echo "Manifest:"
+              printf '%s\n' "$want"
+            fi
+            echo ""
+            echo "Je Zeile: Vielfachheit, dann Muster|Ersetzung|Skip-Datei. Eine bewusste"
+            echo "Listenänderung ist im Manifest direkt unter der Liste nachzuziehen (und"
+            echo "zieht nach der Review-Matrix in CLAUDE.md den Security & Ops Auditor)."
             exit 1
           fi
 
-          echo "Keine Tailwind-3-Idiome in src/ gefunden ($checked Muster geprüft)."
+          # $checked ist keine eigene Prüfung mehr, nur noch die Zahl im Log — und an
+          # dieser Stelle beweisbar richtig: scan() zählt $checked in derselben Zeile
+          # hoch, in der es den Datensatz anhängt, die Zahl ist also immer die
+          # Zeilenzahl von $checked_records, und die stimmt hier gerade Zeile für Zeile
+          # mit dem Manifest überein.
+          echo "Keine Tailwind-3-Idiome in src/ gefunden ($checked Muster geprüft, Liste gegen das Manifest abgeglichen)."
 
       - name: Install dependencies
         run: npm ci
