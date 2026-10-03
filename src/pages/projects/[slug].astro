@@ -338,9 +338,19 @@ const projectJsonLd = {
 
   .prose-project code {
     /* Literal copy of theme.extend.fontFamily.mono in tailwind.config.mjs — change
-       it in both places. Tailwind 4 inlines fontFamily from a legacy @config into
-       the .font-mono utility and emits no --font-* variable, so var(--font-mono)
-       would be dead code here and would invalidate the declaration. */
+       it in both places. The duplication is not a quirk of this file but a
+       consequence of this <style is:global> carrying no @reference: without one,
+       `@apply font-mono` fails the build outright and a `theme` lookup for
+       fontFamily resolves silently to Tailwind's own ui-monospace stack instead
+       of JetBrains Mono (a colour lookup in the same block fails loudly).
+       The style blocks in legal.astro and privacy.astro do carry @reference,
+       which is why both idioms resolve correctly there. var(--font-mono) is no
+       way out either: Tailwind 4 inlines fontFamily from a legacy @config
+       straight into the .font-mono utility and never defines --font-mono, so
+       var(--font-mono) would be dead code here and would invalidate the
+       declaration. The `theme` lookup above is written without its call
+       parentheses on purpose: the pr-build gate greps src/ for the
+       parenthesized form and does not exempt comments. */
     font-family: 'JetBrains Mono', ui-monospace, monospace;
     font-size: 0.84em;
     background: var(--color-stone-100);
