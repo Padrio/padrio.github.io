@@ -6,8 +6,8 @@ import { getCollection } from 'astro:content';
 // Every entry, not just `featured` — that is the point of this page: the home
 // page grid filters on `featured`, so this is the only index that lists a
 // `featured: false` project. Such a project is not unreachable without this
-// page — its own detail page, the prev/next links on its neighbours and the
-// sitemap all cover it — but no overview would show it.
+// page — its own detail page is still built, and the prev/next links on its
+// neighbours and the sitemap reach it — but no overview would show it.
 const projects = await getCollection('projects');
 // Newest first, then alphabetically by id — must stay identical to the sort in
 // src/pages/index.astro (the "Selected Works" grid) and in
@@ -29,10 +29,13 @@ const sortedProjects = projects.sort(
   description="Every project documented on pkrason.de, newest first."
 >
   <section class="max-w-content mx-auto px-4 sm:px-7 pt-8 sm:pt-11 pb-20 sm:pb-[110px]">
-    <!-- data-reveal lives on the wrapper, not the <a>: the reveal rule in
-         global.css is unlayered, so its `transition` shorthand would beat the
-         anchor's transition-colors out of @layer utilities. Same convention as
-         the back link in [slug].astro. -->
+    {/* data-reveal lives on the wrapper, not the <a>: the reveal rule in
+        global.css is unlayered, so its `transition` shorthand would beat the
+        anchor's transition-colors out of @layer utilities. Same convention as
+        the back link in [slug].astro — except for the hover colour: that one is
+        still orange-600 and belongs to PRI-137, this one starts at orange-700
+        for the reason given on the eyebrow below. The divergence is deliberate
+        and temporary; do not "repair" it back to orange-600. */}
     <div data-reveal>
       <a
         href="/"
@@ -46,10 +49,13 @@ const sortedProjects = projects.sort(
     </div>
 
     <div data-reveal class="mb-10 sm:mb-14">
-      <!-- orange-700, not the orange-600 the home page eyebrow still uses: at
-           11.5px this is small text, and rule 4 puts its floor at stone-500
-           (4.58:1), which orange-600 (3.43:1) is under. PRI-137 owns the 20
-           pre-existing sites; this file is new, so it starts at the target. -->
+      {/* orange-700, not the orange-600 the home page eyebrow still uses: at
+          11.5px this is small text, and rule 4 puts its floor at stone-500,
+          which measures 4.58:1 on stone-50 — orange-600 is 3.43:1 and under it.
+          Both numbers are rasterised through a 1x1 canvas, because Tailwind 4
+          hands out raw oklch() and a parser over that text invents plausible
+          numbers; CLAUDE.md records the same 4.58. PRI-137 owns the 20
+          pre-existing sites; this file is new, so it starts at the target. */}
       <p class="font-mono text-[11.5px] tracking-[0.16em] text-orange-700 uppercase mb-3.5">Portfolio</p>
       <h1 class="font-extrabold text-[clamp(2.25rem,7vw,3.25rem)] leading-[1.05] tracking-[-0.035em] text-stone-900">
         All Projects
@@ -59,12 +65,12 @@ const sortedProjects = projects.sort(
       </p>
     </div>
 
-    <!-- Same grid, same wrappers and the same ProjectCard as the "Selected Works"
-         section on the home page, so both paths render identical card data.
-         The heading is sr-only because the h1 above already names the page for
-         sighted users, but ProjectCard renders its titles as <h3> — without an
-         h2 here the document would jump h1 -> h3 (WCAG 1.3.1). On the home page
-         the visible "Selected Works" h2 fills that level. -->
+    {/* Same grid, same wrappers and the same ProjectCard as the "Selected Works"
+        section on the home page, so both paths render identical card data.
+        The heading is sr-only because the h1 above already names the page for
+        sighted users, but ProjectCard renders its titles as <h3> — without an
+        h2 here the document would skip a level, h1 -> h3 (axe heading-order).
+        On the home page the "Selected Works" h2 shown there fills that level. */}
     <h2 class="sr-only">Project list</h2>
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-[22px] items-stretch">
       {sortedProjects.map((project) => (

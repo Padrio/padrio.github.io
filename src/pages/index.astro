@@ -60,12 +60,12 @@ const featuredProjects = projects
       ))}
     </div>
 
-    <!-- The home page's entrance into /projects/; the other inbound link is the
-         "Back to Projects" link in src/pages/projects/[slug].astro, which every
-         detail page carries. Without one of the two the overview page would be
-         the orphan this grid's `featured` filter used to create. data-reveal
-         sits on the wrapper, not the <a>: the unlayered reveal rule's
-         `transition` shorthand would otherwise override transition-colors. -->
+    {/* The home page's entrance into /projects/; the other inbound link is the
+        "Back to Projects" link in src/pages/projects/[slug].astro, which every
+        detail page carries. Without either of them the overview page would be
+        the orphan this grid's `featured` filter used to create. data-reveal
+        sits on the wrapper, not the <a>: the unlayered reveal rule's
+        `transition` shorthand would otherwise override transition-colors. */}
     <div data-reveal class="mt-10 sm:mt-12 text-center">
       <a
         href="/projects/"
