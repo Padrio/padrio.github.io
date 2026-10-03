@@ -54,7 +54,8 @@ tailwind.config.mjs           Tailwind-Theme (u. a. max-w-content); `content` is
                               Grep-Gate gegen Tailwind-3-Idiome in src/, dann npm ci + npm run build
 public/CNAME                  Custom Domain pkrason.de
 public/favicon.svg
-public/images/profile.jpg     Default-OG-Bild
+public/images/profile.webp    Profilfoto im Hero, 264x264 (2x für die 132-px-Darstellung)
+public/images/og-image.png    Default-OG-Bild, 1200x630
 public/images/projects/*.webp Projekt-Screenshots — ausschließlich WebP
 
 src/content.config.ts         Schema der Content Collection "projects" (Zod, Content Layer API)
