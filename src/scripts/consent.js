@@ -21,7 +21,7 @@ const CLARITY_COOKIES = ['_clck', '_clsk'];
 // are gone.
 const CLARITY_SESSION_KEYS = ['_cltk'];
 
-export { GRANTED, DENIED, STORAGE_KEY };
+export { GRANTED };
 
 /**
  * The stored decision, or null when there is none. localStorage access throws
@@ -115,10 +115,20 @@ function clearClarityStorage() {
   }
 }
 
-/** Records consent and starts Clarity. */
+/**
+ * Records consent and starts Clarity.
+ *
+ * Order matters, and it is the same rule as in `denyConsent`: `storeDecision`
+ * announces the new state to every listener, so nothing may be announced
+ * before it is true. `loadClarity()` sets `clarityLoad` synchronously, so
+ * doing it first is what makes `isClarityLoaded()` already answer "yes" when
+ * the listeners run — which is the only thing that keeps the status line on
+ * /privacy/ honest when `setItem` throws and the decision cannot be stored.
+ */
 export function grantConsent() {
+  const loaded = loadClarity();
   storeDecision(GRANTED);
-  return loadClarity();
+  return loaded;
 }
 
 /**
@@ -132,16 +142,57 @@ export function grantConsent() {
  * itself in lean mode instead of shutting down, and the injected script tag
  * cannot be unloaded. Callers that had Clarity running must reload the page;
  * see the revoke handler in `src/pages/privacy.astro`.
+ *
+ * The cleanup runs first and before anything is awaited. It does not depend on
+ * the import and must not be hostage to it — a Clarity chunk whose request
+ * stalls never settles the promise, and `storeDecision` has by then already
+ * told the status line that the cookies are gone. It runs a second time after
+ * `consentv2 … denied`, because Clarity writes once more while shutting down.
  */
-export async function denyConsent() {
-  storeDecision(DENIED);
-  const Clarity = clarityLoad ? await clarityLoad : null;
-  try {
-    Clarity?.consentV2({ analytics_Storage: DENIED, ad_Storage: DENIED });
-  } catch {
-    // Teardown is best effort; the storage cleanup below runs either way.
-  }
+export function denyConsent() {
   clearClarityStorage();
+  storeDecision(DENIED);
+  if (!clarityLoad) return Promise.resolve();
+  return clarityLoad.then((Clarity) => {
+    try {
+      Clarity?.consentV2({ analytics_Storage: DENIED, ad_Storage: DENIED });
+    } catch {
+      // Teardown is best effort; the storage cleanup already ran.
+    }
+    clearClarityStorage();
+  });
+}
+
+/**
+ * Propagates a decision made in another tab into this one.
+ *
+ * `onDecisionChange` listens for a `document` event, which never crosses a tab
+ * boundary, so without this a visitor who withdraws consent in one tab keeps
+ * uploading from every other tab that still has the page open — the cookies
+ * are gone, but the running tracker in the other document keeps sending.
+ *
+ * A withdrawal therefore reloads the other tab: the injected script tag cannot
+ * be unloaded, so a fresh document is the only thing that reliably stops it.
+ * Every other change just re-broadcasts, which also hides a still-visible
+ * banner once the question has been answered elsewhere.
+ */
+export function watchOtherTabs() {
+  window.addEventListener('storage', (event) => {
+    // A null key is `localStorage.clear()` in the other tab, which clears the
+    // decision too.
+    if (event.key !== null && event.key !== STORAGE_KEY) return;
+    try {
+      if (event.storageArea !== window.localStorage) return;
+    } catch {
+      return;
+    }
+    if (readDecision() !== GRANTED && isClarityLoaded()) {
+      clearClarityStorage();
+      window.location.reload();
+      return;
+    }
+    document.dispatchEvent(new CustomEvent(CHANGE_EVENT));
+  });
 }
 
 /**

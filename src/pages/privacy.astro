@@ -150,8 +150,13 @@ import Layout from '../layouts/Layout.astro';
             property, `window.clarity` would then resolve to this heading, and
             the tracker's own queue shim (`window.clarity = window.clarity || fn`)
             would keep the element instead of installing itself — Clarity then
-            throws and never starts, on this page only. */}
-        <h3 id="microsoft-clarity" class="text-xl font-semibold text-stone-800 mb-3 mt-6">Microsoft Clarity</h3>
+            throws and never starts, on this page only.
+
+            scroll-mt-20 is the site's convention for in-page targets (#works,
+            #contact, #career carry it too): without it the sticky nav covers
+            this heading completely when the banner's "What gets collected"
+            link lands here. */}
+        <h3 id="microsoft-clarity" class="text-xl font-semibold text-stone-800 mb-3 mt-6 scroll-mt-20">Microsoft Clarity</h3>
         <p class="text-stone-700 mb-4">
           This website uses Microsoft Clarity, a web analytics service provided by Microsoft Corporation, One Microsoft Way, Redmond, WA 98052, USA ("Microsoft").
         </p>
@@ -159,7 +164,10 @@ import Layout from '../layouts/Layout.astro';
           We use Clarity to understand how this website is actually used: which sections are read, where visitors click and scroll, and where a page is confusing. To do this, Clarity records your interactions with the site — mouse movement, clicks, scrolling, keyboard interaction, window and screen size, browser and operating system — together with the content of the pages you view. Microsoft aggregates these recordings into heatmaps and into individual session recordings that we can replay. Clarity does not ask you for your name, email address, or any other direct identifier, and we do not use it to identify you personally.
         </p>
 
-        <h3 class="text-xl font-semibold text-stone-800 mb-3 mt-6">Legal Basis</h3>
+        {/* h4, not h5 or another h3: these four are sub-points of "Microsoft
+            Clarity" above. As siblings they would read, under heading
+            navigation, as four more tools in section 5. */}
+        <h4 class="text-lg font-semibold text-stone-800 mb-3 mt-6">Legal Basis</h4>
         <p class="text-stone-700 mb-4">
           Clarity is loaded <strong>only after you have actively consented</strong> to it in our consent banner. Until you consent, no Clarity script is loaded, no connection to a Microsoft server is made, and no cookie is set. The legal basis for storing information on, and reading information from, your device is § 25 para. 1 TDDDG; the legal basis for the subsequent processing of your personal data is your consent under Art. 6 para. 1 lit. a GDPR. You may withdraw your consent at any time with effect for the future — see "Withdrawing Your Consent" below.
         </p>
@@ -167,13 +175,14 @@ import Layout from '../layouts/Layout.astro';
           Declining has no consequences for you: the website works identically either way, and nothing else on this site depends on your choice.
         </p>
 
-        <h3 class="text-xl font-semibold text-stone-800 mb-3 mt-6">Cookies Set by Clarity</h3>
+        <h4 class="text-lg font-semibold text-stone-800 mb-3 mt-6">Cookies and Session Storage Set by Clarity</h4>
         <p class="text-stone-700 mb-4">
-          Once you have consented, Clarity stores the following cookies for the domain pkrason.de. Both contain randomly generated identifiers only.
+          Once you have consented, Clarity stores the following entries for the domain pkrason.de. All of them contain randomly generated identifiers only.
         </p>
         <ul class="text-stone-700 mb-4 ml-6 list-disc">
           <li><code>_clck</code> — stores a randomly generated Clarity user ID so that repeat visits from the same browser can be recognised. Lifetime: <strong>365 days</strong>.</li>
           <li><code>_clsk</code> — links the pages you view during one visit into a single session recording. Lifetime: <strong>1 day</strong>.</li>
+          <li><code>_cltk</code> — stored in your browser's <strong>session storage</strong> (not as a cookie); holds a random token for the current browsing session and is discarded when you close the tab. Deleted when you withdraw your consent.</li>
         </ul>
         <p class="text-stone-700 mb-4">
           We have configured Clarity so that it does not grant Microsoft's advertising storage. It therefore does not set advertising cookies and does not link your visit to a Microsoft advertising profile. If you decline, or withdraw your consent, neither cookie is stored and any existing copy is deleted.
@@ -182,7 +191,7 @@ import Layout from '../layouts/Layout.astro';
           Independently of your choice, we store your consent decision itself in your browser's local storage under the key <code>pk-consent-analytics</code>, so that we do not have to ask you again on every page. This entry contains only the value <code>granted</code> or <code>denied</code>, is never transmitted anywhere, and is strictly necessary to provide the function you requested (§ 25 para. 2 no. 2 TDDDG). You can remove it at any time by clearing this site's data in your browser.
         </p>
 
-        <h3 class="text-xl font-semibold text-stone-800 mb-3 mt-6">Data Transfer to the USA</h3>
+        <h4 class="text-lg font-semibold text-stone-800 mb-3 mt-6">Data Transfer to the USA</h4>
         <p class="text-stone-700 mb-4">
           If you consent, the recorded data is transmitted to servers operated by Microsoft under the domain <code>clarity.ms</code> and may be processed in the United States. Microsoft Corporation is based in the USA, which is a third country within the meaning of the GDPR. Please also read the general note in the section "Note on Data Transfer to the USA and Other Third Countries" above.
         </p>
@@ -190,18 +199,27 @@ import Layout from '../layouts/Layout.astro';
           For details on how Microsoft processes this data, please refer to Microsoft's privacy statement: <a href="https://www.microsoft.com/en-us/privacy/privacystatement" target="_blank" rel="noopener noreferrer" class="text-orange-600 hover:text-orange-700 underline">https://www.microsoft.com/en-us/privacy/privacystatement</a>
         </p>
 
-        <h3 class="text-xl font-semibold text-stone-800 mb-3 mt-6">Withdrawing Your Consent</h3>
+        <h4 class="text-lg font-semibold text-stone-800 mb-3 mt-6">Withdrawing Your Consent</h4>
         <p class="text-stone-700 mb-4">
-          You can withdraw your consent to Microsoft Clarity at any time, with effect for the future. Use the button below: it deletes the Clarity cookies, stops any further data from being sent, and reloads this page so that Clarity is not loaded again.
+          You can withdraw your consent to Microsoft Clarity at any time, with effect for the future. Use the button below: it switches Clarity off, deletes the Clarity cookies and Clarity's session entry, and reloads this page so that Clarity is not loaded again. One last transmission of what was already recorded during this page view may still reach Microsoft at the moment you withdraw; after the reload, nothing further is sent.
         </p>
+        {/* Hidden until the script unhides it, the same way the consent banner
+            works: without JavaScript there is no consent to withdraw, and a
+            button that cannot do anything is worse than no button. */}
         <button
           type="button"
           id="clarity-consent-revoke"
+          hidden
           class="inline-flex items-center justify-center gap-2 px-6 py-3 min-h-[44px] bg-stone-900 text-white font-medium rounded-lg hover:bg-stone-800 transition-colors"
         >
           Withdraw consent to Microsoft Clarity
         </button>
-        <p class="text-stone-700 mb-4 mt-4" id="clarity-consent-state" aria-live="polite"></p>
+        {/* The "no decision" wording is rendered here rather than written by
+            the script, because it is the correct state for a page that has not
+            run the script yet — and filling an empty live region on load makes
+            screen readers announce it over the page title. The script now only
+            replaces it when an actual decision exists. */}
+        <p class="text-stone-700 mb-4 mt-4" id="clarity-consent-state" aria-live="polite">You have not been asked yet, or you cleared your choice. Microsoft Clarity is switched off.</p>
         <p class="text-stone-700 mb-4">
           You can also delete the cookies at any time in your browser settings, or prevent them from being stored in the first place. Withdrawing your consent does not affect the lawfulness of the processing that took place before you withdrew it (Art. 7 para. 3 GDPR).
         </p>
@@ -252,32 +270,50 @@ import Layout from '../layouts/Layout.astro';
     GRANTED,
   } from '../scripts/consent.js';
 
+  const stateLine = document.getElementById('clarity-consent-state');
+
   const STATE_TEXT = {
     granted: 'Microsoft Clarity is currently active because you allowed it.',
     denied:
       'Microsoft Clarity is switched off. No data is being sent and the Clarity cookies have been deleted.',
     // localStorage can be cleared at any time, so "no decision" needs its own
-    // wording — showing "active" or nothing at all would misinform.
-    none: 'You have not been asked yet, or you cleared your choice. Microsoft Clarity is switched off.',
+    // wording — showing "active" or nothing at all would misinform. It is read
+    // back out of the markup instead of repeated here, so the server-rendered
+    // default and this script can never drift apart.
+    none: stateLine?.textContent?.trim() ?? '',
   };
 
-  const stateLine = document.getElementById('clarity-consent-state');
   const render = (decision) => {
     if (stateLine) stateLine.textContent = STATE_TEXT[decision ?? 'none'];
   };
-  render(readDecision());
-  onDecisionChange(render);
 
-  document.getElementById('clarity-consent-revoke')?.addEventListener('click', async () => {
-    // Reload only when Clarity is actually running: the library restarts itself
-    // in lean mode on a denied consent instead of shutting down, and its script
-    // tag cannot be unloaded, so one more upload fires after the opt-out. The
-    // reload is what makes "stops any further data from being sent" true. The
-    // stored decision is read rather than only `isClarityLoaded()` because the
-    // order of the two hoisted module scripts on this page is not guaranteed.
-    const wasActive = readDecision() === GRANTED || isClarityLoaded();
-    await denyConsent();
-    if (wasActive) window.location.reload();
+  // A stored decision is not the only way Clarity can be running: an explicit
+  // opt-in loads it even when `setItem` throws and the decision cannot be
+  // remembered. Reporting "switched off" while the tracker is live would be
+  // the one wrong thing this line can say.
+  const currentState = () => readDecision() ?? (isClarityLoaded() ? GRANTED : null);
+
+  const initialState = currentState();
+  // Only touch the live region when the markup's default is actually wrong.
+  if (initialState !== null) render(initialState);
+  onDecisionChange(() => render(currentState()));
+
+  const revoke = document.getElementById('clarity-consent-revoke');
+  if (revoke) revoke.hidden = false;
+
+  revoke?.addEventListener('click', async () => {
+    // Always reload, not just when Clarity was running: the library restarts
+    // itself in lean mode on a denied consent instead of shutting down, and its
+    // script tag cannot be unloaded, so only a fresh document reliably stops
+    // it. The paragraph above promises the reload unconditionally, so it must
+    // not depend on whether this page view happened to have Clarity loaded.
+    //
+    // The wait is bounded: denyConsent() settles only once a pending Clarity
+    // import does, and a stalled chunk request must not hold the reload
+    // hostage. The cookie cleanup it performs is synchronous and has already
+    // happened by the time this returns either way.
+    await Promise.race([denyConsent(), new Promise((resolve) => setTimeout(resolve, 1000))]);
+    window.location.reload();
   });
 </script>
 

@@ -10,14 +10,14 @@
 // all non-answers, not consent.
 //
 // `fixed` keeps it out of the flow: unhiding it shifts no content, so CLS is
-// unaffected.
+// unaffected. The price is that it covers the bottom of the document, which
+// the script below pays for with reserved space — see there.
 //
-// Two colour values are measured, not picked: `border-stone-500` on Decline
-// (4.79:1 on white, where stone-300 is 1.49:1 and leaves the control with no
-// perceivable boundary next to the filled Allow button) and `text-orange-700`
-// on the policy link (5.22:1, where the site's usual orange-600 is 3.58:1 and
-// misses AA for 15px text). Ratios measured against the Tailwind 4 oklch
-// palette, not the old hex values.
+// `border-stone-500` on Decline and `text-orange-700` on the link deviate from
+// the site's usual stone-300/orange-600 on purpose: both of those miss their
+// WCAG contrast minimum here (1.49:1 and 3.58:1 measured against the Tailwind 4
+// oklch palette), and a refusal with no perceivable boundary is not an equal
+// choice next to a filled button.
 ---
 
 <div
@@ -25,7 +25,7 @@
   hidden
   role="region"
   aria-labelledby="consent-banner-title"
-  class="fixed inset-x-0 bottom-0 z-[60] px-4 pb-4 sm:px-6 sm:pb-6"
+  class="fixed inset-x-0 bottom-0 z-[70] px-4 pb-4 sm:px-6 sm:pb-6"
 >
   <div class="max-w-content mx-auto rounded-2xl border border-stone-200 bg-white p-5 shadow-xl sm:p-6">
     <h2 id="consent-banner-title" class="text-[17px] font-semibold text-stone-900">
@@ -33,8 +33,8 @@
     </h2>
     <p class="mt-2 text-[15px] leading-relaxed text-stone-600">
       I'd like to use Microsoft Clarity to see which parts of this portfolio people actually read.
-      It records your clicks and scrolling and sets two cookies. Entirely your choice — the site
-      works the same either way.
+      It records your clicks and scrolling and stores two cookies and a session token. Entirely
+      your choice — the site works the same either way.
     </p>
     {/* Both buttons carry the same weight on purpose: same row, same height, and
         equal widths by construction (`flex-1` inside a container of known
@@ -80,22 +80,54 @@
     grantConsent,
     onDecisionChange,
     readDecision,
+    watchOtherTabs,
   } from '../scripts/consent.js';
 
   // Runs before the banner is touched so a stored opt-in starts Clarity as
   // early as possible, and a stored refusal starts nothing.
   applyStoredDecision();
 
+  // This component is on every page, so it is the one place that registers the
+  // cross-tab listener exactly once per document.
+  watchOtherTabs();
+
   const banner = document.getElementById('consent-banner');
 
   if (banner) {
+    // A `fixed` element covers whatever is beneath it, and at the end of the
+    // document that strip cannot be scrolled out from under it — the footer
+    // links were permanently unreachable on every page, and a focused control
+    // could sit fully behind the banner (WCAG 2.2 SC 2.4.11). So while the
+    // banner is up the document reserves its height twice over:
+    // `padding-bottom` on the body adds scrollable room at the end, and
+    // `scroll-padding-bottom` keeps the browser from parking an element it
+    // scrolls into view underneath it. The height depends on the viewport
+    // width, so it is measured rather than assumed, and re-measured on resize.
+    const reserveSpace = () => {
+      const { height } = banner.getBoundingClientRect();
+      document.body.style.paddingBottom = `${height}px`;
+      document.documentElement.style.scrollPaddingBottom = `${height}px`;
+    };
+
+    const releaseSpace = () => {
+      document.body.style.paddingBottom = '';
+      document.documentElement.style.scrollPaddingBottom = '';
+    };
+
+    const resize = new ResizeObserver(reserveSpace);
+
     if (readDecision() === null) {
       banner.hidden = false;
+      reserveSpace();
+      resize.observe(banner);
     }
-    // Also covers the revoke button on /privacy/, which records a decision
-    // while this banner is still on screen.
+    // Also covers the revoke button on /privacy/ and a decision taken in
+    // another tab, both of which record a decision while this banner is still
+    // on screen.
     onDecisionChange(() => {
       banner.hidden = true;
+      resize.disconnect();
+      releaseSpace();
     });
     document.getElementById('consent-allow')?.addEventListener('click', () => {
       grantConsent();

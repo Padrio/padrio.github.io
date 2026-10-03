@@ -82,11 +82,10 @@ const jsonLd = {
     <!-- JSON-LD Schema -->
     <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
 
-    {/* Microsoft Clarity (heatmaps & session recordings) used to be initialised
-        here, on every page view and without consent. It now loads only after an
-        opt-in, through the dynamic import in src/scripts/consent.js that
-        ConsentBanner drives. Nothing may reference the tracker from the head:
-        a static import or a preconnect would be a request before consent. */}
+    {/* Nothing may reference Microsoft Clarity from the head: a static import
+        or even a preconnect would be a request before consent. It loads only
+        after an opt-in, through the dynamic import in src/scripts/consent.js
+        that ConsentBanner drives. */}
   </head>
   <body>
     <a href="#main" class="skip-link">Skip to content</a>
