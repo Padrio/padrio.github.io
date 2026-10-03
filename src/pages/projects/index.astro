@@ -36,7 +36,7 @@ const sortedProjects = projects.sort(
     <div data-reveal>
       <a
         href="/"
-        class="inline-flex items-center gap-[7px] text-[14.5px] font-medium text-stone-500 hover:text-orange-600 transition-colors mb-7 py-2 min-h-[44px]"
+        class="inline-flex items-center gap-[7px] text-[14.5px] font-medium text-stone-500 hover:text-orange-700 transition-colors mb-7 py-2 min-h-[44px]"
       >
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M15 18l-6-6 6-6"/>
@@ -46,7 +46,11 @@ const sortedProjects = projects.sort(
     </div>
 
     <div data-reveal class="mb-10 sm:mb-14">
-      <p class="font-mono text-[11.5px] tracking-[0.16em] text-orange-600 uppercase mb-3.5">Portfolio</p>
+      <!-- orange-700, not the orange-600 the home page eyebrow still uses: at
+           11.5px this is small text, and rule 4 puts its floor at stone-500
+           (4.58:1), which orange-600 (3.43:1) is under. PRI-137 owns the 20
+           pre-existing sites; this file is new, so it starts at the target. -->
+      <p class="font-mono text-[11.5px] tracking-[0.16em] text-orange-700 uppercase mb-3.5">Portfolio</p>
       <h1 class="font-extrabold text-[clamp(2.25rem,7vw,3.25rem)] leading-[1.05] tracking-[-0.035em] text-stone-900">
         All Projects
       </h1>
