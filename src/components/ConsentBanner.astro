@@ -1,0 +1,107 @@
+---
+// Opt-in gate for Microsoft Clarity. Rendered on every page, hidden until the
+// script finds no stored decision, so a visitor who already chose never sees it
+// again.
+//
+// Deliberately last in the body and not a dialog: the skip link stays the first
+// focusable element, the banner is the last stop in the tab order (which is
+// where it sits visually), and nothing traps focus. Reading on without deciding
+// is allowed and means no tracking — scrolling, Escape and navigating away are
+// all non-answers, not consent.
+//
+// `fixed` keeps it out of the flow: unhiding it shifts no content, so CLS is
+// unaffected.
+//
+// Two colour values are measured, not picked: `border-stone-500` on Decline
+// (4.79:1 on white, where stone-300 is 1.49:1 and leaves the control with no
+// perceivable boundary next to the filled Allow button) and `text-orange-700`
+// on the policy link (5.22:1, where the site's usual orange-600 is 3.58:1 and
+// misses AA for 15px text). Ratios measured against the Tailwind 4 oklch
+// palette, not the old hex values.
+---
+
+<div
+  id="consent-banner"
+  hidden
+  role="region"
+  aria-labelledby="consent-banner-title"
+  class="fixed inset-x-0 bottom-0 z-[60] px-4 pb-4 sm:px-6 sm:pb-6"
+>
+  <div class="max-w-content mx-auto rounded-2xl border border-stone-200 bg-white p-5 shadow-xl sm:p-6">
+    <h2 id="consent-banner-title" class="text-[17px] font-semibold text-stone-900">
+      Help me improve this site?
+    </h2>
+    <p class="mt-2 text-[15px] leading-relaxed text-stone-600">
+      I'd like to use Microsoft Clarity to see which parts of this portfolio people actually read.
+      It records your clicks and scrolling and sets two cookies. Entirely your choice — the site
+      works the same either way.
+    </p>
+    {/* Both buttons carry the same weight on purpose: same row, same height, and
+        equal widths by construction (`flex-1` inside a container of known
+        width), so refusing is exactly as easy as agreeing. Neither is
+        pre-selected and neither takes autofocus.
+
+        `border-transparent` on Allow is load-bearing, not decoration: with
+        `flex-basis: 0` under `box-sizing: border-box` the free space is split
+        evenly *after* each item's padding and border, so Decline's 1px border
+        made it 2px wider than Allow at every width. Equal borders make the two
+        measure identically. */}
+    <div class="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-5">
+      <div class="flex gap-3 sm:w-72 sm:shrink-0">
+        <button
+          id="consent-allow"
+          type="button"
+          class="flex-1 min-h-[44px] rounded-lg border border-transparent bg-stone-900 px-4 py-2 text-[15px] font-semibold text-white transition-colors hover:bg-stone-800"
+        >
+          Allow
+        </button>
+        <button
+          id="consent-decline"
+          type="button"
+          class="flex-1 min-h-[44px] rounded-lg border border-stone-500 bg-white px-4 py-2 text-[15px] font-semibold text-stone-800 transition-colors hover:bg-stone-100"
+        >
+          Decline
+        </button>
+      </div>
+      <a
+        href="/privacy/#microsoft-clarity"
+        class="inline-flex min-h-[44px] items-center text-[15px] text-orange-700 underline transition-colors hover:text-orange-800"
+      >
+        What gets collected
+      </a>
+    </div>
+  </div>
+</div>
+
+<script>
+  import {
+    applyStoredDecision,
+    denyConsent,
+    grantConsent,
+    onDecisionChange,
+    readDecision,
+  } from '../scripts/consent.js';
+
+  // Runs before the banner is touched so a stored opt-in starts Clarity as
+  // early as possible, and a stored refusal starts nothing.
+  applyStoredDecision();
+
+  const banner = document.getElementById('consent-banner');
+
+  if (banner) {
+    if (readDecision() === null) {
+      banner.hidden = false;
+    }
+    // Also covers the revoke button on /privacy/, which records a decision
+    // while this banner is still on screen.
+    onDecisionChange(() => {
+      banner.hidden = true;
+    });
+    document.getElementById('consent-allow')?.addEventListener('click', () => {
+      grantConsent();
+    });
+    document.getElementById('consent-decline')?.addEventListener('click', () => {
+      denyConsent();
+    });
+  }
+</script>
