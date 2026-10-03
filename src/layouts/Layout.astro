@@ -20,11 +20,13 @@ interface Props {
   lang?: string;
 }
 
-// Default OG image: use profile photo (exists in public/images). Override with image prop or add public/images/og-image.png for a dedicated share image.
+// Default OG image: dedicated 1200x630 share card — the ratio the platforms crop to.
+// PNG rather than WebP because WebP preview support differs across platforms.
+// Override per page with the image prop.
 const {
   title,
   description = 'Solutions Architect & backend engineer — architecture, test harnesses and AI agent teams for systems that have to be provably correct.',
-  image = '/images/profile.jpg',
+  image = '/images/og-image.png',
   lang = 'en',
 } = Astro.props;
 const ogLocales: Record<string, string> = { en: 'en_US', de: 'de_DE' };
