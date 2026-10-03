@@ -365,9 +365,30 @@ Stack-Branch ausschließlich über einen gemergten Kind-PR. Die beiden Merges di
 `stack/**` zeigen, sind davon ausgenommen — sie sind der sanktionierte Weg und kein Regelverstoß. Geh
 deswegen nicht nach Regel 12 auf `blocked`.
 
+**Ein Head-Branch hat nie gleichzeitig einen offenen PR gegen `main` und einen gegen `stack/**`.**
+Entscheide dich für eine Base; brauchst du die andere, schließe den ersten PR, bevor du den zweiten
+öffnest. Der Grund: Check-Runs hängen bei `pull_request` am **Head-SHA**, und GitHub erlaubt zwei offene
+PRs von demselben Head, solange die Bases verschieden sind. Ab dem Merge von PR
+[#32](https://github.com/Padrio/padrio.github.io/pull/32) erzeugen dann **beide** PRs einen Check-Run unter
+demselben Namen `pr-build` auf demselben Commit; die Concurrency-Group enthält `github.ref`
+(`refs/pull/N/merge`) und ist pro PR eindeutig, die Läufe räumen sich also nicht gegenseitig ab — die
+Reihenfolge ist ein Rennen. Ein grüner Lauf, der gegen den **Stack**-Base gebaut hat, kann so den
+Required-Kontext des `main`-PRs erfüllen. Im Trefferfall landet ein nicht bauender Commit in `main`,
+`deploy.yml` schlägt fehl und die vorherige Fassung bleibt live — die Seite wird alt, nicht kaputt.
+**Nicht gemessen.** Belegt sind aus [PRI-163](/PRI/issues/PRI-163) nur die Head-SHA-Bindung des Check-Runs
+(`total_count: 1`, `name: pr-build` auf dem Head-SHA) und die disjunkten Concurrency-Gruppen; **alles Übrige
+in diesem Absatz ist hergeleitet.** Security & Ops hat dort ausdrücklich offengelassen, wie GitHub zwei
+gleichnamige Check-Runs auf einem Commit auflöst und ob zwei PRs vom selben Head mit verschiedenen Bases
+wirklich beide feuern. Ungemessen ist auch die Prämisse, dass GitHub zwei solche PRs überhaupt gleichzeitig
+offen sein lässt — PRI-163 führt sie im Indikativ, aber ohne Beleg; der Nachweis hätte den zweiten
+künstlichen PR gebraucht, den [PRI-158](/PRI/issues/PRI-158) untersagt hat. Die Regel gilt trotzdem — sie
+kostet nichts und bleibt richtig, auch wenn die Mechanik milder ist als beschrieben. Board-Entscheidung vom
+2026-10-02 ([PRI-166](/PRI/issues/PRI-166)).
+
 **Mechanik.**
 
-- Branch-Schema `stack/<epic-kennung>-<slug>`, z. B. `stack/pri-14-baseline-1`. Angelegt von `main`.
+- Branch-Schema `stack/<epic-kennung>-<slug>`, z. B. `stack/pri-14-baseline-1`. Angelegt von `main`, und zwar **vom Implementer des ersten Kindes** — er pusht ohnehin als erster darauf. Den Branch-Namen und die E0/E1-Markierung der Kinder legt Chief of Staff bei der Triage des Epics fest und schreibt beides ins Epic-Issue; den Ref erzeugt Chief of Staff nicht selbst, weil Chief of Staff in diesem Projekt keine Branches anlegt. Board-Entscheidung vom 2026-10-02 ([PRI-166](/PRI/issues/PRI-166)).
+- `stack/` ist dabei **kleingeschrieben und braucht mindestens ein Segment nach dem Slash**: `stack` allein, `stacks/x` oder `stack-x` matchen den Filter `branches:` in `pr-build.yml` (Einträge `main` und `'stack/**'`) nicht, und der Fehlschlag ist still — es entsteht dann gar kein Check. Die Begründung ist ausdrücklich **nicht** „GitHub-Branch-Filter sind case-sensitiv": das hat keiner der beiden Auditoren belegt, und `git check-ref-format` akzeptiert `Stack/foo` als legalen Branchnamen. Der serverseitige Matcher ist ungemessen — halte dich deshalb an die kleingeschriebene Form.
 - Kind-Branches wie gehabt `agent/<issue-kennung>-<slug>` — aber abgezweigt **vom aktuellen Tip des Stack-Branches**, nicht von `main`. PR-Base ist der Stack-Branch.
 - Merge in den Stack **immer mit `--no-ff`**, ein Merge-Commit pro Kind. **Kein Squash, kein Fast-Forward.** Der Grund gehört mitgeschrieben, weil die Regel sonst nach Formalismus aussieht: nur so nimmt `git revert -m 1 <merge-sha>` ein einzelnes Kind wieder heraus, ohne die Historie umzuschreiben und ohne die anderen Kinder anzufassen.
 - **Rebase auf gepushten Stack- und Kind-Branches ist verboten.** Ein Rebase schreibt SHAs um, auf die Review-Verdikte und die Worktrees anderer Agents zeigen. Verdikte gelten für einen Head-SHA; solange nur per Merge aktualisiert wird, bleiben sie haltbar. Das ist die Ausnahme zu **Arbeitsablauf**, Schritt 5 (*Den Branch aktuell halten*): das Nachziehen per Rebase dort gilt für PRs gegen `main`, nicht innerhalb eines Stacks — im Stack wird gemergt, siehe *Drift von `main`*.
@@ -407,6 +428,11 @@ Was nicht in den ersten Stack passt, wird `stack/<epic>-2`. Vor dem Start eines 
 `git merge-tree --write-tree` gegen den ersten vorgeprüft — ein gemeldeter Konflikt ist das gute Ergebnis,
 ein glatter Test-Merge die Konstellation, in der man sich täuscht.
 
+Wird die Grenze **Lebensdauer bis zur Übergabe (7 Tage)** überschritten, gilt kein Automatismus: der
+Implementer eskaliert per Kommentar mit @-Erwähnung von Chief of Staff im Epic-Issue und arbeitet weiter.
+Der Stack wird **nicht** erzwungen unfertig an das Board übergeben — über das weitere Vorgehen entscheidet
+Chief of Staff. Board-Entscheidung vom 2026-10-02 ([PRI-166](/PRI/issues/PRI-166)).
+
 **Wann nicht gestapelt wird.** Ein einzelnes, unabhängiges Issue geht wie bisher als normaler PR gegen
 `main`. Dringendes ebenfalls — ein Kind im Stack geht erst mit dem ganzen Stack live. Stapeln lohnt erst,
 wenn zwei offene Issues dieselbe Datei anfassen oder eines den Code des anderen braucht.
@@ -438,7 +464,10 @@ nicht machen.
 [PRI-158](/PRI/issues/PRI-158), PR [#32](https://github.com/Padrio/padrio.github.io/pull/32). **Bis #32
 gemergt ist, greift der Trigger nicht:** `pr-build.yml` filtert dann weiter auf `branches: [ main ]`, und
 ein Kind-PR gegen `stack/**` erzeugt *gar keinen* Check — keinen roten, sondern keinen. Prüfe das am ersten
-Kind-PR eines neuen Stacks, bevor du dich auf das Gate verlässt. Läuft an einem Kind-PR gegen `stack/**`
+Kind-PR eines neuen Stacks, bevor du dich auf das Gate verlässt. „Kein Check" liest man **über die API,
+nicht in der PR-Ansicht**: `pull-request-read` mit `method: get_check_runs`; vorhanden ist der Check, wenn
+`total_count ≥ 1` ist **und** ein Eintrag `name: "pr-build"` trägt. Ein fehlender Check sieht im UI nicht
+wie ein Fehler aus — genau diese Fehlerklasse ist hier gemeint. Läuft an einem Kind-PR gegen `stack/**`
 **kein** Check, wird nicht gemergt: dann fehlen beide automatischen Qualitätsgates des Projekts (Regel 3 —
 `npm run build` und das Grep-Gate gegen Tailwind-3-Idiome). Kommentar an Chief of Staff statt
 weiterarbeiten.
