@@ -90,6 +90,7 @@ Die Detailseite wird für **jedes** Projekt erzeugt, unabhängig von `featured`.
 ## Die 14 harten Regeln für pkrason.de — gelten ohne Ausnahme
 
 1. **Niemals direkt auf `main` pushen.** Ein Push auf `main` ist ein Production-Deploy (`.github/workflows/deploy.yml` deployt bei jedem Push auf `main` live). Jede Änderung: eigener Branch → Pull Request → Review durch den Code Auditor (Pflicht bei jedem PR; QA Auditor und Security & Ops Auditor zusätzlich nach der Review-Matrix unten) → **das Board merged**.
+   **Präzisierung für Stacks, vom Board am 2026-10-02 freigegeben ([PRI-155](/PRI/issues/PRI-155)):** Das Merge-Monopol des Boards gilt für `main`. Ein Agent darf einen vollständig reviewten Kind-PR in einen `stack/**`-Branch mergen — und nur dorthin. Direkte Commits auf `stack/**` sind verboten. Alles übrige an Regel 1 bleibt unverändert. Das Verfahren steht im Abschnitt **Stacked Pull-Requests**; dies ist eine Präzisierung von Regel 1 und keine neue Regel — die Nummerierung bleibt bei 14.
 2. **Git-Identität:** Der **Commit-Author** ist „Pascal Krason <p.krason@icloud.com>" und wird verbindlich per `git commit --author="Pascal Krason <p.krason@icloud.com>"` gesetzt. Der **Committer** ist die Laufzeit-Identität des Workspace und wird nicht umgangen — insbesondere nicht durch einen direkten Aufruf von `/usr/bin/git`, mit dem ein Agent eine Laufzeitkontrolle über die Commit-Attribution unterlaufen würde. **Keine `Co-Authored-By`-Zeilen** in Commits oder PR-Beschreibungen — weder Claude noch Paperclip. Claude Code fügt sie standardmäßig hinzu; prüfe jede Commit-Message und jeden PR-Body, bevor du ihn abschickst.
    *Die Regel bindet den Branch-Commit. Was beim Merge auf `main` aus dem Author wird, entscheidet GitHub — siehe **Runtime-Realität**, „Der Commit-Author liegt beim Agent, der Committer nicht".*
 3. **Vor jedem PR muss `npm run build` fehlerfrei durchlaufen.** Das Ergebnis wird im zugehörigen Issue dokumentiert. Es gibt weder Tests noch Linter — der Build ist das eine von zwei Qualitätsgates; das zweite ist das Grep-Gate gegen Tailwind-3-Idiome, das im selben Workflow **vor** `npm ci` läuft (Abschnitt *Befehle*). Seit dem 2026-09-30 ist diese Regel zusätzlich technisch erzwungen: der Status-Check `pr-build` ist auf dem Default-Branch per Ruleset Pflicht, ein PR mit rotem oder fehlendem `pr-build` ist nicht mergebar (siehe **Runtime-Realität**, „`main` ist per Ruleset geschützt").
@@ -339,7 +340,131 @@ Das ändert **nichts an der Auslöser-Tabelle oben** — welcher Auditor bei wel
 
 ---
 
+## Stacked Pull-Requests
+
+Vom Board am 2026-10-02 freigegebenes Verfahren für Epics, deren Kinder einander im Weg stehen
+([PRI-155](/PRI/issues/PRI-155); die vollständige Begründung steht im Dokument „Konzept: Stacked
+Pull-Requests für pkrason.de" dort). Es hebt Regel 1 nicht auf, sondern präzisiert sie — siehe die
+Präzisierung direkt unter Regel 1.
+
+**Invariante.** Es gibt genau einen Integrationspunkt, an dem nur das Board mergt: `main`. Darunter einen
+zweiten, an dem das Team selbst integriert: `stack/**`. Ein Stack-Branch deployt nie — `deploy.yml` hängt
+an Pushes auf `main`, nicht auf `stack/**`.
+
+**Wer mergt was.**
+
+| Von | Nach | Wer |
+|---|---|---|
+| `agent/**` | `stack/**` | der Implementer, nach allen Reviews |
+| `main` | `stack/**` | der Implementer, per `git merge origin/main`, ohne Kind-PR (siehe *Drift von `main`*) |
+| `stack/**` | `main` | nur das Board |
+| alles | `main` direkt | nur das Board |
+
+„Direkte Commits auf `stack/**` sind verboten" (Regel 1) meint **inhaltliche** Commits: Inhalt bekommt ein
+Stack-Branch ausschließlich über einen gemergten Kind-PR. Die beiden Merges dieser Tabelle, die auf
+`stack/**` zeigen, sind davon ausgenommen — sie sind der sanktionierte Weg und kein Regelverstoß. Geh
+deswegen nicht nach Regel 12 auf `blocked`.
+
+**Mechanik.**
+
+- Branch-Schema `stack/<epic-kennung>-<slug>`, z. B. `stack/pri-14-baseline-1`. Angelegt von `main`.
+- Kind-Branches wie gehabt `agent/<issue-kennung>-<slug>` — aber abgezweigt **vom aktuellen Tip des Stack-Branches**, nicht von `main`. PR-Base ist der Stack-Branch.
+- Merge in den Stack **immer mit `--no-ff`**, ein Merge-Commit pro Kind. **Kein Squash, kein Fast-Forward.** Der Grund gehört mitgeschrieben, weil die Regel sonst nach Formalismus aussieht: nur so nimmt `git revert -m 1 <merge-sha>` ein einzelnes Kind wieder heraus, ohne die Historie umzuschreiben und ohne die anderen Kinder anzufassen.
+- **Rebase auf gepushten Stack- und Kind-Branches ist verboten.** Ein Rebase schreibt SHAs um, auf die Review-Verdikte und die Worktrees anderer Agents zeigen. Verdikte gelten für einen Head-SHA; solange nur per Merge aktualisiert wird, bleiben sie haltbar. Das ist die Ausnahme zu **Arbeitsablauf**, Schritt 5 (*Den Branch aktuell halten*): das Nachziehen per Rebase dort gilt für PRs gegen `main`, nicht innerhalb eines Stacks — im Stack wird gemergt, siehe *Drift von `main`*.
+- Echtes Stapeln (Kind auf Kind) nur als Ausnahme, **maximale Tiefe 2**. Darüber wird serialisiert.
+
+**Review im Stack.** Der Review-Scope ist `git diff <stack-branch>...<kind-branch>` — **drei Punkte**, also
+gegen die Merge-Base. Mit zwei Punkten oder gegen `main` sieht der Auditor alle bereits gemergten
+Geschwister mit und meldet sie als Findings. Das Review-Child-Issue muss deshalb Stack-Branch,
+Kind-Branch, PR-Link **und dieses Diff-Kommando wörtlich** nennen. Findings an einem Kind, das schon im
+Stack liegt: neues Kind-Issue, Fix nach vorne — keine geschlossenen Reviews wiederbeleben, keine
+Stack-Historie umschreiben.
+
+**Drift von `main`.** Mergt jemand nach `main`, während ein Stack offen ist:
+
+1. **nur der Stack-Branch** holt nach, per `git merge origin/main`;
+2. jedes **offene** Kind mergt danach den neuen Stack-Tip ein; geschlossene Kinder werden nicht angefasst;
+3. niemals rebasen.
+
+Der Zweck des Nachziehens ist hier allein die Konfliktfreiheit beim späteren `--no-ff` — **nicht** ein
+Merge-Blocker. Das Ruleset `main: pr-build required` mit `strict_required_status_checks_policy: true` gilt
+für `~DEFAULT_BRANCH` (**Runtime-Realität**, „`main` ist per Ruleset geschützt"); ein Kind-PR mit Base
+`stack/**` wird also nie als `mergeable_state: "behind"` blockiert. Such an einem Kind-PR nicht nach einem
+Blocker, den es dort nicht gibt — das ist der Unterschied zu **Arbeitsablauf**, Schritt 5, der genau diesen
+Blocker beschreibt.
+
+**Obergrenzen.**
+
+| Grenze | Wert |
+|---|---|
+| Kinder pro Stack | max. 8 |
+| Lebensdauer bis zur Übergabe | max. 7 Tage |
+| Stack-Tiefe (Kind auf Kind) | max. 2 |
+| Gleichzeitig offene Stacks im Projekt | max. 2 |
+| Gleichzeitig offene Kinder pro Stack | max. 3 |
+
+Was nicht in den ersten Stack passt, wird `stack/<epic>-2`. Vor dem Start eines zweiten Stacks wird mit
+`git merge-tree --write-tree` gegen den ersten vorgeprüft — ein gemeldeter Konflikt ist das gute Ergebnis,
+ein glatter Test-Merge die Konstellation, in der man sich täuscht.
+
+**Wann nicht gestapelt wird.** Ein einzelnes, unabhängiges Issue geht wie bisher als normaler PR gegen
+`main`. Dringendes ebenfalls — ein Kind im Stack geht erst mit dem ganzen Stack live. Stapeln lohnt erst,
+wenn zwei offene Issues dieselbe Datei anfassen oder eines den Code des anderen braucht.
+
+**Entscheidungen blockieren den Stack nicht.** Bei der Triage bekommt jedes Kind-Issue eine Marke: **E0**
+entscheidungsfrei (Befund steht im Repo, in `CLAUDE.md` oder in `.cursorrules`) oder **E1**
+entscheidungsabhängig (braucht einen Fakt oder eine Abwägung vom Board). Daraus:
+
+1. Der Stack wird ausschließlich aus E0 gebaut.
+2. Die Entscheidung wird ein eigenes Issue mit einer Frage-Karte ans Board; der Stack läuft weiter, während sie offen ist.
+3. Kommt die Antwort, setzt die E1-Umsetzung auf den dann aktuellen Stack-Tip auf oder geht in den nächsten Stack.
+4. Ein E1 darf nie `blockedBy` eines E0 sein. Kollidieren beide in derselben Datei, geht trotzdem das E0 zuerst.
+5. **Warten auf einen Merge ist kein `blockedBy`.** `blockedBy` ist nur eine fehlende Entscheidung oder ein fehlender Fakt. Alles andere ist Reihenfolge, und Reihenfolge löst der Stack.
+
+**Status-Abbildung.**
+
+| Lage | Status |
+|---|---|
+| Kind implementiert, Reviews laufen | `in_progress` |
+| Kind in den Stack gemergt | `done`, mit Kommentar „integriert in `stack/x`, Deploy-Check über das Epic-Issue" |
+| Epic, während der Stack sich füllt | `in_progress` |
+| Epic, Stack-PR liegt beim Board | `in_review` |
+| Epic, nach Merge und Deploy-Check | `done` |
+
+Der Deploy-Check wandert damit vom Kind zum Epic: ein Kind geht nie einzeln live, also kann es ihn auch
+nicht machen.
+
+**Das Gate.** `pr-build` triggert auch für Base `stack/**` — eingeführt mit
+[PRI-158](/PRI/issues/PRI-158), PR [#32](https://github.com/Padrio/padrio.github.io/pull/32). **Bis #32
+gemergt ist, greift der Trigger nicht:** `pr-build.yml` filtert dann weiter auf `branches: [ main ]`, und
+ein Kind-PR gegen `stack/**` erzeugt *gar keinen* Check — keinen roten, sondern keinen. Prüfe das am ersten
+Kind-PR eines neuen Stacks, bevor du dich auf das Gate verlässt. Läuft an einem Kind-PR gegen `stack/**`
+**kein** Check, wird nicht gemergt: dann fehlen beide automatischen Qualitätsgates des Projekts (Regel 3 —
+`npm run build` und das Grep-Gate gegen Tailwind-3-Idiome). Kommentar an Chief of Staff statt
+weiterarbeiten.
+
+---
+
 ## Arbeitsablauf für ein Issue
+
+Dieser Ablauf ist der Normalfall: Branch von `main`, PR gegen `main`, Merge durch das Board. **Läuft dein
+Issue als Kind in einem Stack** (Abschnitt *Stacked Pull-Requests*), weichen sechs Punkte ab:
+
+1. Der Branch zweigt vom aktuellen Tip des Stack-Branches ab statt von `main` (Schritt 1, *Worktree und
+   Branch*).
+2. PR-Base ist der Stack-Branch statt `main` (Schritt 4, *PR öffnen*).
+3. **Es wird nicht rebast, sondern der neue Stack-Tip gemergt** (Schritt 5, *Den Branch aktuell halten* —
+   siehe *Drift von `main`*). Schritt 5 gilt in seinem Wortlaut nur für PRs gegen `main`; im Stack ist
+   Rebase verboten.
+4. Das Review-Child-Issue nennt zusätzlich Stack-Branch, Kind-Branch und das Drei-Punkt-Diff-Kommando
+   wörtlich (Schritt 6, *Review anfordern* — siehe *Review im Stack*).
+5. Nach allen Reviews mergt der Implementer selbst mit `--no-ff` in den Stack, statt den PR dem Board zu
+   übergeben (Schritt 8, *Übergabe an das Board*).
+6. Der Deploy-Check liegt beim Epic-Issue statt beim Kind (Schritt 9, *Deploy-Check*).
+
+Alles übrige — Worktree, `npm ci`, Build, Commit-Regeln, der Umgang mit Findings — gilt unverändert. Die
+Schrittnamen stehen hier mit, damit die Verweise nicht stumm falsch werden, wenn ein künftiger PR einen
+Schritt einschiebt; im Zweifel gilt der Name, nicht die Nummer.
 
 1. Eigenen Worktree anlegen, Branch nach obigem Schema.
 2. `npm ci`, implementieren, `npm run build` — Ausgabe ins Issue.
