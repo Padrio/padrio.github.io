@@ -17,7 +17,10 @@
 // the site's usual stone-300/orange-600 on purpose: both of those miss their
 // WCAG contrast minimum here (1.49:1 and 3.58:1 measured against the Tailwind 4
 // oklch palette), and a refusal with no perceivable boundary is not an equal
-// choice next to a filled button.
+// choice next to a filled button. The replacements were measured too, not
+// guessed: stone-500 border 4.79:1 against white (SC 1.4.11 needs 3:1) and
+// orange-700 text 5.22:1 (SC 1.4.3 needs 4.5:1 at this size). Putting either
+// back "on convention" reintroduces a failure.
 ---
 
 <div
@@ -125,6 +128,11 @@
     // another tab, both of which record a decision while this banner is still
     // on screen.
     onDecisionChange(() => {
+      // Order is load-bearing. Hiding the banner makes the observer queue a
+      // 0×0 record; only because `disconnect()` runs in the same task is that
+      // record dropped before `reserveSpace` could write `0px`. Swap
+      // `disconnect()` and `releaseSpace()` and `padding-bottom: 0px` stays
+      // behind as an inline style instead of being cleared.
       banner.hidden = true;
       resize.disconnect();
       releaseSpace();

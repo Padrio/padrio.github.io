@@ -173,10 +173,28 @@ export function denyConsent() {
  *
  * A withdrawal therefore reloads the other tab: the injected script tag cannot
  * be unloaded, so a fresh document is the only thing that reliably stops it.
- * Every other change just re-broadcasts, which also hides a still-visible
- * banner once the question has been answered elsewhere.
+ *
+ * No reload loop: nothing in here writes the decision key. `clearClarityStorage`
+ * does write `sessionStorage`, which is a real `storage`-event source as well —
+ * but those events only reach documents that share the same `sessionStorage`
+ * (same tab, so iframes; this site has none), and the `_cltk` key would be
+ * rejected by the key guard below anyway. No load path writes `localStorage`
+ * either: `applyStoredDecision` only reads.
+ *
+ * The spec excludes the writing tab from delivery, so the tab the visitor
+ * clicked in does not run any of this a second time. A browser that delivers to
+ * the writer regardless (old WebKit) would get a harmless second reload on the
+ * revoke path — but on the banner path a reload that "Decline" deliberately
+ * does not do.
  */
+let watching = false;
+
 export function watchOtherTabs() {
+  // Registration is guaranteed once per document by ConsentBanner rendering
+  // once, but a second listener would mean two reloads, so it does not hang on
+  // that alone.
+  if (watching) return;
+  watching = true;
   window.addEventListener('storage', (event) => {
     // A null key is `localStorage.clear()` in the other tab, which clears the
     // decision too.
@@ -191,6 +209,18 @@ export function watchOtherTabs() {
       window.location.reload();
       return;
     }
+    // Past the reload branch, a null decision means the other tab emptied the
+    // store: there is nothing to propagate. Returning is what keeps a visible
+    // banner up — the change event hides it unconditionally, which would strand
+    // the visitor on a page that neither tracks nor asks.
+    if (readDecision() === null) return;
+    // A grant has to take effect here before it is announced, or the status
+    // line on /privacy/ reports a tracker this document never loaded. Same
+    // rule as `grantConsent`: nothing is announced before it is true. The
+    // decision is the same person's explicit action and is already stored, so
+    // this only brings the document forward to what its next navigation would
+    // do anyway.
+    if (readDecision() === GRANTED) loadClarity();
     document.dispatchEvent(new CustomEvent(CHANGE_EVENT));
   });
 }

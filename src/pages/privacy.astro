@@ -177,7 +177,7 @@ import Layout from '../layouts/Layout.astro';
 
         <h4 class="text-lg font-semibold text-stone-800 mb-3 mt-6">Cookies and Session Storage Set by Clarity</h4>
         <p class="text-stone-700 mb-4">
-          Once you have consented, Clarity stores the following entries for the domain pkrason.de. All of them contain randomly generated identifiers only.
+          Once you have consented, Clarity stores the following entries for pkrason.de. None of them contains your name, your email address, or any other information that identifies you directly; they hold randomly generated identifiers plus technical values such as a timestamp and a counter.
         </p>
         <ul class="text-stone-700 mb-4 ml-6 list-disc">
           <li><code>_clck</code> — stores a randomly generated Clarity user ID so that repeat visits from the same browser can be recognised. Lifetime: <strong>365 days</strong>.</li>
@@ -185,7 +185,7 @@ import Layout from '../layouts/Layout.astro';
           <li><code>_cltk</code> — stored in your browser's <strong>session storage</strong> (not as a cookie); holds a random token for the current browsing session and is discarded when you close the tab. Deleted when you withdraw your consent.</li>
         </ul>
         <p class="text-stone-700 mb-4">
-          We have configured Clarity so that it does not grant Microsoft's advertising storage. It therefore does not set advertising cookies and does not link your visit to a Microsoft advertising profile. If you decline, or withdraw your consent, neither cookie is stored and any existing copy is deleted.
+          We have configured Clarity so that it does not grant Microsoft's advertising storage. It therefore does not set advertising cookies and does not link your visit to a Microsoft advertising profile. If you decline, or withdraw your consent, none of these entries is stored, and any existing copy is deleted.
         </p>
         <p class="text-stone-700 mb-4">
           Independently of your choice, we store your consent decision itself in your browser's local storage under the key <code>pk-consent-analytics</code>, so that we do not have to ask you again on every page. This entry contains only the value <code>granted</code> or <code>denied</code>, is never transmitted anywhere, and is strictly necessary to provide the function you requested (§ 25 para. 2 no. 2 TDDDG). You can remove it at any time by clearing this site's data in your browser.
@@ -205,7 +205,8 @@ import Layout from '../layouts/Layout.astro';
         </p>
         {/* Hidden until the script unhides it, the same way the consent banner
             works: without JavaScript there is no consent to withdraw, and a
-            button that cannot do anything is worse than no button. */}
+            button that cannot do anything is worse than no button. The script
+            only unhides it while consent is actually given — see there. */}
         <button
           type="button"
           id="clarity-consent-revoke"
@@ -279,8 +280,13 @@ import Layout from '../layouts/Layout.astro';
     // localStorage can be cleared at any time, so "no decision" needs its own
     // wording — showing "active" or nothing at all would misinform. It is read
     // back out of the markup instead of repeated here, so the server-rendered
-    // default and this script can never drift apart.
-    none: stateLine?.textContent?.trim() ?? '',
+    // default and this script can never drift apart. The literal is the
+    // fallback for an empty read only: rewriting or removing the paragraph
+    // above would otherwise turn this state into a silent empty line, with no
+    // build error and nothing in the console to notice it by.
+    none:
+      stateLine?.textContent?.trim() ||
+      'You have not been asked yet, or you cleared your choice. Microsoft Clarity is switched off.',
   };
 
   const render = (decision) => {
@@ -293,13 +299,25 @@ import Layout from '../layouts/Layout.astro';
   // the one wrong thing this line can say.
   const currentState = () => readDecision() ?? (isClarityLoaded() ? GRANTED : null);
 
+  const revoke = document.getElementById('clarity-consent-revoke');
+
+  // Only when there is something to withdraw. Unhiding it unconditionally put
+  // "Withdraw consent to Microsoft Clarity" directly above "You have not been
+  // asked yet", and a click there recorded a refusal the visitor had never been
+  // asked for. `currentState` rather than the stored value, so the button is
+  // also offered when an opt-in is running but could not be persisted.
+  const syncRevoke = () => {
+    if (revoke) revoke.hidden = currentState() !== GRANTED;
+  };
+
   const initialState = currentState();
   // Only touch the live region when the markup's default is actually wrong.
   if (initialState !== null) render(initialState);
-  onDecisionChange(() => render(currentState()));
-
-  const revoke = document.getElementById('clarity-consent-revoke');
-  if (revoke) revoke.hidden = false;
+  syncRevoke();
+  onDecisionChange(() => {
+    render(currentState());
+    syncRevoke();
+  });
 
   revoke?.addEventListener('click', async () => {
     // Always reload, not just when Clarity was running: the library restarts
