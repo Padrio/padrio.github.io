@@ -160,8 +160,9 @@ jobs:
           # | blur-sm                 | dieselbe Verschiebung                                         | blur-xs                  |
           # | drop-shadow-sm          | dieselbe Verschiebung                                         | drop-shadow-xs           |
           # | theme(                  | unter @config KEIN totes var(), sondern ein Literal — siehe   | Farbe: var(--color-…);   |
-          # |                         | (c) unter der Tabelle. Steht als Konventionsregel auf der     | Font: @apply font-mono   |
-          # |                         | Liste, nicht als CSS-Defekt                                   | (--font-mono fehlt)      |
+          # |                         | (c) unter der Tabelle. Steht als Konventionsregel auf der     | Font: @apply font-mono,  |
+          # |                         | Liste, nicht als CSS-Defekt                                   | ohne @reference literal  |
+          # |                         |                                                               | (--font-mono fehlt)      |
           # | *-opacity-              | in TW4 entfernt, erzeugt stillschweigend kein CSS             | Slash-Syntax,            |
           # |                         |                                                               | z. B. bg-stone-900/50    |
           # | flex-shrink- /          | in TW4 umbenannt; die alte Schreibweise emittiert weiter      | shrink- / grow-          |
@@ -200,8 +201,9 @@ jobs:
           #       funktioniert es, außerhalb scheitert es laut und wird schon vom zweiten
           #       Gate gefangen. Auf dieser Liste steht es, damit es bei EINER
           #       Schreibweise im Repo bleibt — und die ist asymmetrisch: bei Farben die
-          #       CSS-Variable var(--color-…), bei fontFamily @apply font-mono oder der
-          #       literale Stack, weil --font-mono nicht emittiert wird.
+          #       CSS-Variable var(--color-…), bei fontFamily @apply font-mono — und in
+          #       einem <style> ohne @reference, wo @apply ein harter Buildfehler ist,
+          #       der literale Stack, weil --font-mono nicht emittiert wird.
           # Gemessen am 2026-10-01 gegen das installierte tailwindcss 4.3.3, zweimal
           # unabhängig: über compile() aus dem Paket und am gebauten dist/-CSS dieses
           # Projekts (also mit dem @config-Legacy-Modus aus global.css). Je identische
@@ -237,9 +239,10 @@ jobs:
           # Farbabfrage wie theme('colors.orange.600') löst unter @config zwar auf,
           # aber die Unterscheidung gehört nicht in eine Mustersuche. Wer hier
           # hereinläuft, nimmt die Ersetzung aus dem Hinweis: bei Farben die
-          # CSS-Variable, bei fontFamily @apply font-mono — ein --font-mono gibt es
-          # nicht. Kein Fehlalarm.
-          scan   "theme("                "theme\("                 "bei Farben var(--color-…); bei fontFamily @apply font-mono oder den Stack literal — --font-mono gibt es nicht"
+          # CSS-Variable, bei fontFamily @apply font-mono, und in einem <style> ohne
+          # @reference den literalen Stack — ein --font-mono gibt es nicht. Kein
+          # Fehlalarm.
+          scan   "theme("                "theme\("                 "bei Farben var(--color-…); bei fontFamily @apply font-mono, in <style> ohne @reference nur der literale Stack — --font-mono gibt es nicht"
 
           prefix "bg-opacity-"           "Slash-Syntax, z. B. bg-stone-900/50"
           prefix "text-opacity-"         "Slash-Syntax, z. B. text-stone-900/50"
