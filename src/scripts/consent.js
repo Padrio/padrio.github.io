@@ -203,6 +203,46 @@ export function isClarityLoaded() {
 }
 
 /**
+ * The two Clarity hosts whose names are known before the first request.
+ *
+ * `www.clarity.ms` serves the tag loader, `scripts.clarity.ms` the recorder.
+ * The upload host is deliberately absent: it is a single-letter shard picked at
+ * runtime — 11 different ones over 19 measured page views — so no hint can name
+ * it, and a hint for the wrong shard would pay DNS and TLS for a connection
+ * nothing ever uses.
+ */
+const CLARITY_PRECONNECT_HOSTS = [
+  'https://www.clarity.ms',
+  'https://scripts.clarity.ms',
+];
+
+/**
+ * Opens the connections to the two fixed Clarity hosts.
+ *
+ * Called only from `loadClarity()`, which is the whole reason this is safe: a
+ * `<link rel="preconnect">` in the document head would run a DNS lookup and a
+ * TLS handshake against Microsoft while the head is parsed, which hands a
+ * third-country recipient the visitor's IP address before they have agreed to
+ * anything — exactly what the banner exists to prevent. Here it cannot fire
+ * before a grant, and the request it warms is at most a few dozen milliseconds
+ * behind it either way.
+ *
+ * No `crossorigin` attribute. Clarity injects both hosts as plain script tags,
+ * which are no-CORS requests and use the credentialed socket pool; a hint
+ * marked `crossorigin` lands in the anonymous pool and warms a socket neither
+ * request can claim. Measured on the live site: without the attribute the
+ * recorder reused the open socket in 8 of 8 page views, with it in 0 of 3.
+ */
+function preconnectClarity() {
+  for (const host of CLARITY_PRECONNECT_HOSTS) {
+    const link = document.createElement('link');
+    link.rel = 'preconnect';
+    link.href = host;
+    document.head.appendChild(link);
+  }
+}
+
+/**
  * Loads, starts and consents to Clarity, analytics storage only.
  *
  * `ad_Storage` must stay denied. `Clarity.consent(true)` and
@@ -217,6 +257,10 @@ export function isClarityLoaded() {
  */
 function loadClarity() {
   if (!clarityLoad) {
+    // Before the import, not after: the import resolving is what triggers the
+    // first request to `www.clarity.ms`, so the hint has to be in flight while
+    // the chunk is still being fetched to buy anything at all.
+    preconnectClarity();
     clarityLoad = import('@microsoft/clarity')
       .then(({ default: Clarity }) => {
         Clarity.init(CLARITY_PROJECT_ID);
