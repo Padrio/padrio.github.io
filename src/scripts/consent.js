@@ -69,7 +69,7 @@ const CLARITY_PROJECT_ID = 'wu9fh588ka';
 // tag, which this site does not use.
 //
 // This is a floor for the cleanup below, not its definition — see
-// `clearClarityStorage`, which enumerates by prefix instead of trusting these
+// `clearClarityCookies`, which enumerates by prefix instead of trusting these
 // two names. The engine is fetched unversioned at runtime, so Microsoft can
 // add a name without anything being deployed here.
 const CLARITY_COOKIES = ['_clck', '_clsk'];
@@ -94,6 +94,16 @@ const CLARITY_SESSION_KEYS = ['_cltk'];
 // name is read out of `document.cookie` and written straight back into it, so
 // it stays restricted to characters that cannot carry a cookie attribute.
 const CLARITY_NAME = /^_cl[\w.-]*$/;
+// The same hazard on the other side of the assignment. A path comes out of
+// `location.pathname` and goes into the attribute string unescaped, and `;` is
+// a legal path character the browser leaves as-is there: `path=/a;b; max-age=0`
+// is read as `Path=/a` plus a junk attribute, so the delete would land on a
+// shorter path than the one it names — a silent miss, which is the whole class
+// of bug this cleanup exists to close. Such a path is dropped from the chain
+// instead of emitted. Nothing reachable is lost: `;` is the `Set-Cookie`
+// separator, so a cookie path containing one can only arise as the default path
+// of a document served from such a URL, and no route on this site has one.
+const UNSAFE_IN_COOKIE_PATH = /[;,\s]/;
 
 export { GRANTED };
 
@@ -204,14 +214,19 @@ function loadClarity() {
  * cost of widening it one character too far is deleting the visitor's own
  * decision record: /privacy/ promises that record is kept until they clear it
  * themselves, so this is the guard that has to outlive the pattern.
+ *
+ * Every deletion in this file goes through here, the enumerated names and the
+ * two hard-coded floors alike. A floor that bypassed it would leave exactly the
+ * widening this guard exists for uncaught on the half of the input that is
+ * easiest to edit.
  */
 function isClarityName(name) {
   return name !== STORAGE_KEY && CLARITY_NAME.test(name);
 }
 
 /**
- * Expires every `_cl` cookie this document can see, across every domain and
- * path attribute it could have been written with.
+ * Expires every `_cl` cookie this document can see, over every domain and path
+ * attribute it could have been written with and that a delete can address.
  *
  * A cookie's identity is its name *and* its domain and path, so a delete whose
  * attributes do not match is a silent no-op. That was already handled for the
@@ -220,34 +235,58 @@ function isClarityName(name) {
  * written on any deeper path. Both halves of the chain are swept — `/projects`
  * and `/projects/` are two distinct cookies, not one spelled two ways.
  *
+ * The chain is cut at slash *positions* and not at non-empty segments. That
+ * looks like a detail and is the difference between covering this document and
+ * covering a normalised idea of it: skipping empty segments collapses `//` to
+ * `/`, and `https://pkrason.de//projects/konteo-panel/` is a live 200 on this
+ * site — GitHub Pages neither normalises nor redirects it. A document there has
+ * `location.pathname === '//projects/konteo-panel/'`, so a chain built from
+ * segments would be disjoint from the real one below `/` and every delete for
+ * the deep half a no-op. Measured: with the segment walk a default-path `_clck`
+ * on such a URL survived "Decline"; over slash positions it does not.
+ *
  * The names are read out of the jar instead of being listed. A hard-coded list
  * is a measurement of one engine version, and the engine is loaded unversioned
  * from clarity.ms at runtime (PRI-200), so Microsoft can add a cookie without
  * a deploy here and the list would go stale with no build error and nothing in
- * the console. `CLARITY_COOKIES` is still folded in as a floor: it is what runs
- * when the jar hands back nothing useful, and it keeps the measured names on
- * the record.
+ * the console. `CLARITY_COOKIES` is still folded in as a floor: it always runs
+ * alongside the enumeration, and it is what is left when the jar hands back
+ * nothing, which also keeps the measured names on the record.
  *
  * The price of covering the two attribute sets by repetition is one assignment
- * per name × domain × path: 5 domains on this site, and 1 path on `/` rising to
- * 5 on a project page. With the floor's two names and nothing else in the jar
- * that is 10 and 50 assignments. Measured on `/projects/konteo-panel/` in
- * headless Chromium: 25 assignments 0.2 ms, 50 → 0.4 ms, 150 → 1.1 ms, 300 →
- * 2.2 ms (medians of 20 sweeps each, after one warm-up sweep; the slowest
- * single sweep in every one of those sizes, 25 included, was ~6–7 ms, so the
- * tail is not the count). Linear and far below anything a visitor could notice,
- * but it is linear — a much wider name pattern would be a different claim.
+ * per name × domain × path. Three domains on this site: `registrable !== host`
+ * is false on a two-label apex host, so those two variants are only added on a
+ * subdomain, and no reachable hostname resolves to one (`www.` and
+ * `padrio.github.io` both 301 to the apex). One path on `/` rising to 5 on a
+ * project page, so with the floor's two names and nothing else in the jar that
+ * is 6 and 30 assignments. Measured on `/projects/konteo-panel/` in headless
+ * Chromium, indexed by assignment count rather than by page: 25 assignments
+ * 0.2 ms, 50 → 0.4 ms, 150 → 1.1 ms, 300 → 2.2 ms (medians of 20 sweeps each,
+ * after one warm-up sweep; the slowest single sweep in every one of those
+ * sizes, 25 included, was ~6–7 ms, so the tail is not the count). That run used
+ * a three-label host, where the domain set is 5 and a project page is 50 — the
+ * timings are per assignment and hold either way. Linear and far below anything
+ * a visitor could notice, but it is linear — a much wider name pattern would be
+ * a different claim.
  *
- * What stays out of reach: a cookie on a path that is not on this document's
- * own chain — `/projects/konteo-panel/` seen from `/privacy/`. `document.cookie`
- * does not report it and a delete cannot address it. That is how the cookie API
- * works, not a gap in here, and it is why this runs on every page view (see
- * `applyStoredDecision`) rather than once: each page view reaches its own chain,
- * and `/` — where Clarity itself writes — is on every one of them. An HttpOnly
- * cookie is out of reach in the same final way, and the floor does not help
- * there either: a `document.cookie` write that would overwrite an HttpOnly
- * cookie is discarded by the cookie store. Measured in this workspace; Clarity
- * sets its cookies from script, so none of its own are HttpOnly.
+ * Three things stay out of reach, none of them fixable here:
+ *
+ *   - A cookie on a path that is not on this document's own chain —
+ *     `/projects/konteo-panel/` seen from `/privacy/`. `document.cookie` does
+ *     not report it and a delete cannot address it. That is how the cookie API
+ *     works. Each page view reaches its own chain, so running the cleanup on
+ *     more page views narrows this; `/`, where Clarity itself writes, is on
+ *     every chain, which is why the entries /privacy/ actually names are always
+ *     reachable. Today the callers are the decline/withdraw paths only (see
+ *     `denyConsent`, `watchOtherTabs`) — PR #45 adds `applyStoredDecision` as a
+ *     per-page-view caller, and until it lands this limit holds for every path
+ *     other than the one the visitor declined on.
+ *   - A path carrying a character that would end the attribute early, which is
+ *     dropped rather than emitted; see `UNSAFE_IN_COOKIE_PATH`.
+ *   - An HttpOnly cookie, and the floor does not help there either: a
+ *     `document.cookie` write that would overwrite an HttpOnly cookie is
+ *     discarded by the cookie store. Measured in this workspace; Clarity sets
+ *     its cookies from script, so none of its own are HttpOnly.
  */
 function clearClarityCookies() {
   const host = window.location.hostname;
@@ -258,20 +297,34 @@ function clearClarityCookies() {
     domains.add(`.${registrable}`);
   }
 
+  const { pathname } = window.location;
   const paths = new Set(['/']);
-  let walked = '';
-  for (const segment of window.location.pathname.split('/')) {
-    if (!segment) continue;
-    walked += `/${segment}`;
-    paths.add(walked);
-    paths.add(`${walked}/`);
+  const addPath = (candidate) => {
+    if (!UNSAFE_IN_COOKIE_PATH.test(candidate)) paths.add(candidate);
+  };
+  for (let i = pathname.indexOf('/', 1); i !== -1; i = pathname.indexOf('/', i + 1)) {
+    addPath(pathname.slice(0, i));
+    addPath(`${pathname.slice(0, i)}/`);
+  }
+  // The last segment has no slash after it, so the loop above never reaches it.
+  // `/legal` has to sweep `/legal/` as well, and a trailing slash means the
+  // loop already covered both halves.
+  if (!pathname.endsWith('/')) {
+    addPath(pathname);
+    addPath(`${pathname}/`);
   }
 
-  // A cookie name cannot contain `;` or `=`, so splitting on those is enough to
-  // recover it from the serialised jar.
-  const names = new Set(CLARITY_COOKIES);
+  // A cookie name cannot contain `;` or `=`, so splitting on those recovers it
+  // from the serialised jar — but only for a cookie that has a name. One with
+  // an empty name serialises as its bare value, with no `=` at all, and
+  // splitting that would hand back the *value* as a name. Those are skipped:
+  // Clarity writes named cookies, and inventing a name produces deletes for a
+  // cookie that never existed while leaving the real entry in place.
+  const names = new Set(CLARITY_COOKIES.filter(isClarityName));
   for (const entry of document.cookie.split(';')) {
-    const name = entry.split('=')[0].trim();
+    const equals = entry.indexOf('=');
+    if (equals === -1) continue;
+    const name = entry.slice(0, equals).trim();
     if (isClarityName(name)) names.add(name);
   }
 
@@ -288,16 +341,24 @@ function clearClarityCookies() {
  * Removes every `_cl` key from one web storage area, `floor` included whether
  * or not it was enumerated.
  *
+ * The floor goes through `isClarityName` like everything else rather than being
+ * removed unchecked. It changes nothing today — all of `CLARITY_SESSION_KEYS`
+ * matches — and it is what makes the claim on `isClarityName` true of every
+ * deletion this file performs instead of only the enumerated half, which is the
+ * point of having the guard at all: a widened pattern and a widened list are
+ * the same mistake, and one predicate is where that gets caught.
+ *
  * `Object.keys` on a `Storage` takes a snapshot, so removing while iterating it
- * is safe. The whole body is guarded because reaching `window.sessionStorage`
- * or `window.localStorage` at all throws in some private-browsing
- * configurations — the same reason `readDecision` is guarded.
+ * is safe. A key in `floor` that is not present is a no-op, and one that is
+ * also enumerated is removed twice, which is equally harmless. The whole body
+ * is guarded because reaching `window.sessionStorage` or `window.localStorage`
+ * at all throws in some private-browsing configurations — the same reason
+ * `readDecision` is guarded.
  */
 function sweepStorage(open, floor = []) {
   try {
     const storage = open();
-    for (const key of floor) storage.removeItem(key);
-    for (const key of Object.keys(storage)) {
+    for (const key of [...floor, ...Object.keys(storage)]) {
       if (isClarityName(key)) storage.removeItem(key);
     }
   } catch {
@@ -341,9 +402,10 @@ export function grantConsent() {
 /**
  * Records a refusal and tears down whatever Clarity already stored. The
  * `consentv2 … denied` call is what makes Clarity delete `_clck`/`_clsk`
- * itself; the explicit cleanup covers `_cltk`, which Clarity does not remove,
- * and the case where Clarity was never loaded in this page view but left
- * storage behind from an earlier one.
+ * itself; the explicit cleanup covers every other `_cl` entry in either web
+ * storage area and on any path of this document — `_cltk` is the one that was
+ * measured, not the extent of it — and the case where Clarity was never loaded
+ * in this page view but left storage behind from an earlier one.
  *
  * This does not stop Clarity for the current page view — the library restarts
  * itself in lean mode instead of shutting down, and the injected script tag
