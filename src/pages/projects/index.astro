@@ -1,0 +1,90 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import ProjectCard from '../../components/ProjectCard.astro';
+import { getCollection } from 'astro:content';
+
+// Every entry, not just `featured` — that is the point of this page: the home
+// page grid filters on `featured`, so this is the only index that lists a
+// `featured: false` project. Such a project is not unreachable without this
+// page — its own detail page is still built, and the prev/next links on its
+// neighbours and the sitemap reach it — but no overview would show it.
+const projects = await getCollection('projects');
+// Newest first, then alphabetically by id — must stay identical to the sort in
+// src/pages/index.astro (the "Selected Works" grid) and in
+// src/pages/projects/[slug].astro (prev/next). konteo-panel and konteo-provision
+// share a date, so without the id tie-breaker their order is whatever
+// getCollection() happens to return, and the glob loader resolves its file reads
+// concurrently — that order is a race that can differ between two builds of the
+// same commit. Locale-independent on purpose, see the note in
+// src/pages/index.astro.
+const sortedProjects = projects.sort(
+  (a, b) =>
+    new Date(b.data.date).getTime() - new Date(a.data.date).getTime() ||
+    (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
+);
+---
+
+<Layout
+  title="All Projects - Pascal Krason"
+  description="Every project documented on pkrason.de, newest first."
+>
+  <section class="max-w-content mx-auto px-4 sm:px-7 pt-8 sm:pt-11 pb-20 sm:pb-[110px]">
+    {/* data-reveal lives on the wrapper, not the <a>: the reveal rule in
+        global.css is unlayered, so its `transition` shorthand would beat the
+        anchor's transition-colors out of @layer utilities. Same convention as
+        the back link in [slug].astro — except for the hover colour: that one is
+        still orange-600 and belongs to PRI-137, this one starts at orange-700
+        for the reason given on the eyebrow below. The divergence is deliberate
+        and temporary; do not "repair" it back to orange-600. */}
+    <div data-reveal>
+      <a
+        href="/"
+        class="inline-flex items-center gap-[7px] text-[14.5px] font-medium text-stone-500 hover:text-orange-700 transition-colors mb-7 py-2 min-h-[44px]"
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M15 18l-6-6 6-6"/>
+        </svg>
+        Back to Home
+      </a>
+    </div>
+
+    <div data-reveal class="mb-10 sm:mb-14">
+      {/* orange-700, not the orange-600 the home page eyebrow still uses: at
+          11.5px this is small text, and rule 4 puts its floor at stone-500,
+          which measures 4.58:1 on stone-50 — orange-600 is 3.43:1 and under it.
+          Both numbers are rasterised through a 1x1 canvas, because Tailwind 4
+          hands out raw oklch() and a parser over that text invents plausible
+          numbers; CLAUDE.md records the same 4.58. PRI-137 owns the 20
+          pre-existing sites; this file is new, so it starts at the target. */}
+      <p class="font-mono text-[11.5px] tracking-[0.16em] text-orange-700 uppercase mb-3.5">Portfolio</p>
+      <h1 class="font-extrabold text-[clamp(2.25rem,7vw,3.25rem)] leading-[1.05] tracking-[-0.035em] text-stone-900">
+        All Projects
+      </h1>
+      <p class="text-[17px] text-stone-500 mt-3.5 max-w-[520px] leading-relaxed">
+        Every project documented on this site, newest first.
+      </p>
+    </div>
+
+    {/* Same grid, same wrappers and the same ProjectCard as the "Selected Works"
+        section on the home page, so both paths render identical card data.
+        The heading is sr-only because the h1 above already names the page for
+        sighted users, but ProjectCard renders its titles as <h3> — without an
+        h2 here the document would skip a level, h1 -> h3 (axe heading-order).
+        On the home page the "Selected Works" h2 shown there fills that level. */}
+    <h2 class="sr-only">Project list</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-[22px] items-stretch">
+      {sortedProjects.map((project) => (
+        <div data-reveal class="flex">
+          <ProjectCard
+            title={project.data.title}
+            description={project.data.description}
+            href={`/projects/${project.id}`}
+            image={project.data.image}
+            tags={project.data.tags || []}
+            flagship={project.data.flagship}
+          />
+        </div>
+      ))}
+    </div>
+  </section>
+</Layout>
