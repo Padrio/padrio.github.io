@@ -163,15 +163,45 @@ export function denyConsent() {
   });
 }
 
+/**
+ * Brings this document in line with `decision`: a tracker that is running
+ * without a `granted` decision gets its storage cleared and the document
+ * reloaded, because the injected script tag cannot be unloaded.
+ *
+ * Takes the decision rather than reading it, so a caller that has already read
+ * it keeps deciding on a single read — see the `storage` handler below.
+ *
+ * Returns whether a reload was requested. Every caller has to treat `true` as
+ * "stop here": a reload is asynchronous, so the document is still live and
+ * fully scriptable afterwards, and anything that runs on would be acting on a
+ * state that is about to be thrown away.
+ */
+function enforceDecision(decision) {
+  if (decision === GRANTED || !isClarityLoaded()) return false;
+  clearClarityStorage();
+  window.location.reload();
+  return true;
+}
+
 let watching = false;
 
 /**
- * Propagates a decision made in another tab into this one.
+ * Propagates a decision this document did not see being made into it. Two ways
+ * it can miss one, both handled here.
  *
- * `onDecisionChange` listens for a `document` event, which never crosses a tab
- * boundary, so without this a visitor who withdraws consent in one tab keeps
- * uploading from every other tab that still has the page open — the cookies
- * are gone, but the running tracker in the other document keeps sending.
+ * **Another tab.** `onDecisionChange` listens for a `document` event, which
+ * never crosses a tab boundary, so without this a visitor who withdraws consent
+ * in one tab keeps uploading from every other tab that still has the page open
+ * — the cookies are gone, but the running tracker in the other document keeps
+ * sending.
+ *
+ * **The back/forward cache.** A frozen document receives no `storage` event at
+ * all, and it is restored with its JavaScript state untouched: script tag still
+ * in the DOM, `clarityLoad` still set. Clarity itself is bfcache-compatible —
+ * the shipped engine registers `pagehide`/`visibilitychange` and neither
+ * `unload` nor `beforeunload` — so a page with Clarity running really does get
+ * frozen rather than discarded, and on `pageshow` it has to re-read the
+ * decision instead of trusting the one it loaded with.
  *
  * A withdrawal therefore reloads the other tab: the injected script tag cannot
  * be unloaded, so a fresh document is the only thing that reliably stops it.
@@ -208,11 +238,7 @@ export function watchOtherTabs() {
     // One read for all three branches below: they run in the same task and have
     // to agree on what the other tab left behind.
     const decision = readDecision();
-    if (decision !== GRANTED && isClarityLoaded()) {
-      clearClarityStorage();
-      window.location.reload();
-      return;
-    }
+    if (enforceDecision(decision)) return;
     // A grant has to take effect here before it is announced, or the status
     // line on /privacy/ reports a tracker this document never loaded. Same
     // rule as `grantConsent`: nothing is announced before it is true. The
@@ -227,15 +253,34 @@ export function watchOtherTabs() {
     // which it cannot do if the event never arrives.
     document.dispatchEvent(new CustomEvent(CHANGE_EVENT));
   });
+
+  window.addEventListener('pageshow', (event) => {
+    // Only a restore. A normal page load has already run
+    // `applyStoredDecision()`, and `isClarityLoaded()` is false in a fresh
+    // document anyway — but reloading on every `pageshow` would reload on every
+    // navigation, so the guard is not a formality.
+    if (event.persisted) enforceDecision(readDecision());
+  });
 }
 
 /**
  * Honours a decision made in an earlier page view. Only a stored `granted`
  * loads Clarity — no decision, a refusal, an unreadable store and a corrupted
  * value all do nothing.
+ *
+ * Everything that is not a `granted` also reconciles storage with the decision,
+ * on every single page view. That is deliberately broader than "undo the last
+ * revoke": it collects any Clarity cookie that outlived a cleanup which failed,
+ * raced a navigation or never ran, whatever left it behind. It is what makes
+ * the promise on /privacy/ — that a withdrawal deletes any existing copy — true
+ * for longer than the moment of the click. Cost is a handful of
+ * `document.cookie` assignments per page view, all no-ops once the jar is
+ * empty.
  */
 export function applyStoredDecision() {
   if (readDecision() === GRANTED) {
     loadClarity();
+  } else {
+    clearClarityStorage();
   }
 }
