@@ -113,15 +113,16 @@ const projectJsonLd = {
         Deliberately NOT stuck to the viewport from lg up. It used to be, with a
         92px offset; that was removed for PRI-122 (board decision 2026-10-04).
 
-        The card is 470-844px tall depending on the project, so it outgrew the
-        window it was pinned inside (viewport height minus the offset). At
-        1024x768 four of its eleven links were entirely obscured at the moment
-        they took focus and only six were usable at all — a WCAG 2.2 SC 2.4.11
-        (Focus Not Obscured) failure. A pinned box snaps back to its viewport
-        position, which is why neither the browser's own scroll-on-focus nor the
-        bottom scroll padding the consent banner sets on the root element could
-        bring those links into view. Without the pinning both work: 11 of 11
-        links usable across all four measured viewports, banner open or answered.
+        The card is 470-844px tall depending on the project, so on four of the
+        five pages it outgrew the window it was pinned inside (viewport height
+        minus the offset). At 1024x768 four of konteo-panel's eleven links were
+        entirely obscured at the moment they took focus and only six were usable
+        at all — a WCAG 2.2 SC 2.4.11 (Focus Not Obscured) failure. A pinned box
+        snaps back to its viewport position, which is why neither the browser's
+        own scroll-on-focus nor the bottom scroll padding the consent banner sets
+        on the root element could bring those links into view. Without the
+        pinning every sidebar link is usable on all five pages across all four
+        measured viewports, banner open or answered.
 
         The alternative was a height cap plus an inner scroll container. It fixes
         the same links but leaves the banner's share of the problem in place and
