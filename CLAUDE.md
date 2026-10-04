@@ -139,7 +139,7 @@ gilt das Issue.
 | Stelle | Regel | Ist-Stand |
 |---|---|---|
 | `src/components/Navigation.astro:9` | Regel 4 / `.cursorrules` §2: kein Glassmorphism, kein `backdrop-blur` | Sticky-Nav nutzt `backdrop-blur-md backdrop-saturate-150` |
-| `src/pages/index.astro:63` (Kontakt-Strip), `src/styles/global.css:47` (Skip-Link) | Regel 4 / `.cursorrules` „Design Philosophy", Zeile 7 (`STRICT RULE: NO DARK MODE`) | Beide sind `bg-stone-900`. Lesart „kein umschaltbares Dark-Theme" vs. „keine dunkle Sektion" ist ungeklärt. |
+| `src/pages/index.astro:82` (Kontakt-Strip), `src/styles/global.css:47` (Skip-Link) | Regel 4 / `.cursorrules` „Design Philosophy", Zeile 7 (`STRICT RULE: NO DARK MODE`) | Beide sind `bg-stone-900`. Lesart „kein umschaltbares Dark-Theme" vs. „keine dunkle Sektion" ist ungeklärt. |
 
 **Eine dritte Zeile ist am 2026-10-03 entfallen,** nicht gelöst durch eine Codeänderung: `text-stone-400`
 auf dem dunklen Kontakt-Strip. Mit der Präzisierung „auf hellem Grund" in Regel 4 ist das keine Abweichung
