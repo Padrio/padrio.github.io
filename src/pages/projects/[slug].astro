@@ -5,7 +5,8 @@ import { getCollection, render, type CollectionEntry } from 'astro:content';
 export async function getStaticPaths() {
   const projects: CollectionEntry<'projects'>[] = await getCollection('projects');
   // Newest first, then alphabetically by id — must stay identical to the sort in
-  // src/pages/index.astro so the "Selected Works" grid and prev/next agree.
+  // src/pages/index.astro and src/pages/projects/index.astro, so the "Selected
+  // Works" grid, the /projects/ overview and prev/next all agree.
   // The id tie-breaker is what keeps konteo-panel and konteo-provision (same date)
   // in a stable order instead of inheriting the glob loader's file-read race.
   // Locale-independent on purpose, see the note in src/pages/index.astro.
@@ -74,7 +75,7 @@ const projectJsonLd = {
            `transition` shorthand would otherwise override transition-colors. -->
       <div data-reveal>
         <a
-          href="/#works"
+          href="/projects/"
           class="inline-flex items-center gap-[7px] text-[14.5px] font-medium text-stone-500 hover:text-orange-600 transition-colors mb-7 py-2 min-h-[44px]"
         >
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
