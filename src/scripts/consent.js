@@ -5,11 +5,32 @@
 // `@microsoft/clarity` lands in its own chunk that is never fetched. Every
 // failure path in here resolves to "no tracking": an unreadable localStorage,
 // an unknown stored value and a failed import all leave Clarity unloaded.
+//
+// A stored consent is also bound to a version of the purpose and has a
+// lifetime; both are enforced in one place, in `readDecision` — see there.
 
 const STORAGE_KEY = 'pk-consent-analytics';
 const GRANTED = 'granted';
 const DENIED = 'denied';
 const CHANGE_EVENT = 'pk-consent-change';
+
+// A consent is only ever consent to one particular description of the purpose.
+// Bump this whenever what Clarity collects, or where it is transmitted,
+// changes: every record written under an older number stops counting as an
+// answer, so the banner asks again against the new description. It is a plain
+// integer and the only thing that has to be edited for that — the comparison
+// below is an equality check, so there is no ordering to get wrong.
+const CONSENT_VERSION = 1;
+// 365 days. A consent that never lapses is not informed consent about the
+// current state of the site, so a record older than this stops counting as an
+// answer in exactly the same way an older version does. It applies to a
+// refusal too, deliberately: the recorded answer is an answer to one version
+// of one question, and that is as true of "no" as of "yes". The alternative —
+// a refusal that is remembered forever — reads as more respectful but silently
+// means the question can never be put again, not even when the purpose
+// changes under a new version. Re-asking once a year is the same cadence in
+// both directions.
+const CONSENT_MAX_AGE_MS = 365 * 24 * 60 * 60 * 1000;
 
 const CLARITY_PROJECT_ID = 'wu9fh588ka';
 // The two cookies Clarity actually writes on this domain. The three names in
@@ -24,23 +45,53 @@ const CLARITY_SESSION_KEYS = ['_cltk'];
 export { GRANTED };
 
 /**
- * The stored decision, or null when there is none. localStorage access throws
- * in some private-browsing configurations, and the value can be anything a
- * visitor puts there; both cases count as "no decision", which keeps the gate
- * closed rather than guessing.
+ * The stored decision, or null when there is none that still counts.
+ *
+ * The stored record is `<decision>:<version>:<millisecond timestamp>` and is
+ * accepted only in exactly that shape, with the current version and inside the
+ * maximum age. Everything else is "no decision", which leaves the gate closed
+ * and brings the banner back: an unreadable store (localStorage access throws
+ * in some private-browsing configurations), a record from an older version of
+ * the purpose, an expired one, and any value a visitor or another script put
+ * there. That is one rule, not four — the only accepted input is a record this
+ * module wrote, recently, for this version — and it is what makes the
+ * privacy-friendly outcome the default for every unforeseen value as well.
+ *
+ * `split` with a length check rather than a prefix test: `startsWith(GRANTED)`
+ * would accept `granted:2:…`, and a bare `granted` left over from the
+ * unversioned format has one part, not three, so it is rejected without a
+ * special case.
  */
 export function readDecision() {
+  let stored;
   try {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    return stored === GRANTED || stored === DENIED ? stored : null;
+    stored = window.localStorage.getItem(STORAGE_KEY);
   } catch {
     return null;
   }
+  if (typeof stored !== 'string') return null;
+  const parts = stored.split(':');
+  if (parts.length !== 3) return null;
+  const [decision, version, recordedAt] = parts;
+  if (decision !== GRANTED && decision !== DENIED) return null;
+  if (version !== String(CONSENT_VERSION)) return null;
+  // Digits only, and the whole string. `Number()` is far too generous to gate
+  // an expiry on: it reads '' as 0, ' 12 ' as 12, '1e99' as 1e99 and '0x10' as
+  // 16, so a value that is not a timestamp at all would get an age computed
+  // for it — and `1e99` would be an age that never expires.
+  if (!/^\d+$/.test(recordedAt)) return null;
+  const age = Date.now() - Number(recordedAt);
+  // A record dated in the future is not accepted either. It cannot have been
+  // written by this module on this clock, so it is either corrupted or the
+  // clock moved backwards; both are "ask again" rather than "trust a stamp
+  // that will not expire for as long as it is ahead".
+  if (age < 0 || age > CONSENT_MAX_AGE_MS) return null;
+  return decision;
 }
 
 function storeDecision(value) {
   try {
-    window.localStorage.setItem(STORAGE_KEY, value);
+    window.localStorage.setItem(STORAGE_KEY, `${value}:${CONSENT_VERSION}:${Date.now()}`);
   } catch {
     // Nothing to do: without persistence the decision simply is not
     // remembered, so the banner asks again on the next page view. That is the
@@ -231,8 +282,16 @@ export function watchOtherTabs() {
 
 /**
  * Honours a decision made in an earlier page view. Only a stored `granted`
- * loads Clarity — no decision, a refusal, an unreadable store and a corrupted
- * value all do nothing.
+ * that `readDecision` still accepts loads Clarity — no decision, a refusal, an
+ * unreadable store, a corrupted value, a consent for an older version of the
+ * purpose and an expired one all do nothing.
+ *
+ * What it does not do is delete what an earlier, now lapsed, consent already
+ * let Clarity store. Nothing reads or sends those entries while there is no
+ * accepted decision, and `_clck`'s own 365-day lifetime is the same as the
+ * consent lifetime above, so it expires on roughly the same schedule. Deleting
+ * them here would be a second promise about storage that the privacy policy
+ * does not currently make; it is a question for that text, not for this file.
  */
 export function applyStoredDecision() {
   if (readDecision() === GRANTED) {
