@@ -72,10 +72,16 @@ const CLARITY_PROJECT_ID = 'wu9fh588ka';
 // `clearClarityCookies`, which enumerates by prefix instead of trusting these
 // two names. The engine is fetched unversioned at runtime, so Microsoft can
 // add a name without anything being deployed here.
+//
+// A name added here has to match `CLARITY_NAME` too. The floor runs through
+// `isClarityName` like every other deletion, so a name that does not match is
+// ignored silently — no build error, nothing in the console, and it still looks
+// handled because it is in the list. Widen the pattern with it.
 const CLARITY_COOKIES = ['_clck', '_clsk'];
 // Clarity keeps its session token in sessionStorage. It survives a revoke
 // otherwise, which would leave a Clarity identifier behind after the cookies
-// are gone. Same standing as the list above: a floor, not the definition.
+// are gone. Same standing as the list above: a floor, not the definition, and
+// subject to `CLARITY_NAME` in exactly the same way.
 const CLARITY_SESSION_KEYS = ['_cltk'];
 // What counts as "Clarity's" in first-party storage: every name Clarity has
 // been seen to write here starts with `_cl` (`_clck`, `_clsk`, `_cltk`).
@@ -100,10 +106,27 @@ const CLARITY_NAME = /^_cl[\w.-]*$/;
 // is read as `Path=/a` plus a junk attribute, so the delete would land on a
 // shorter path than the one it names — a silent miss, which is the whole class
 // of bug this cleanup exists to close. Such a path is dropped from the chain
-// instead of emitted. Nothing reachable is lost: `;` is the `Set-Cookie`
-// separator, so a cookie path containing one can only arise as the default path
-// of a document served from such a URL, and no route on this site has one.
-const UNSAFE_IN_COOKIE_PATH = /[;,\s]/;
+// instead of emitted.
+//
+// `;` is the only character that needs dropping, and the class stays that
+// narrow on purpose. Too wide is not the safe direction here: a path that would
+// have been addressable and is discarded anyway ends the same way as a
+// character this missed — the cookie survives and nothing says so. Measured
+// over every ASCII codepoint, what reaches `location.pathname` literally is
+// `! $ % & ' ( ) * + , - . / : ; = @ [ ] _ | ~` and alphanumerics. Of those only
+// `;` ends an attribute value; a comma path *is* addressable, measured in
+// Chromium — on a document at `/a,b/`, `path=/a,b; max-age=0` deletes the
+// default-path cookie. Whitespace cannot reach a pathname at all: space and
+// U+00A0, U+2028, U+3000 arrive percent-encoded, tab/CR/LF are stripped. The
+// control range is in the class as a belt rather than from need — RFC 6265
+// keeps it out of an attribute value, so it stays out here if a path ever
+// arrives from somewhere other than `location`.
+//
+// None of this is reachable today: a path holding a `;` is a 404 on this site,
+// and the GitHub Pages error page does not carry this script, so no document
+// that runs the sweep can sit on such a path. Slugs staying inside `[a-z0-9-]`
+// is what keeps it that way.
+const UNSAFE_IN_COOKIE_PATH = /[;\x00-\x1f\x7f]/;
 
 export { GRANTED };
 
@@ -265,9 +288,22 @@ function isClarityName(name) {
  * after one warm-up sweep; the slowest single sweep in every one of those
  * sizes, 25 included, was ~6–7 ms, so the tail is not the count). That run used
  * a three-label host, where the domain set is 5 and a project page is 50 — the
- * timings are per assignment and hold either way. Linear and far below anything
- * a visitor could notice, but it is linear — a much wider name pattern would be
- * a different claim.
+ * timings are per assignment and hold either way.
+ *
+ * On a route of this site that is far below anything a visitor could notice.
+ * The path count, though, is the visitor's URL rather than the site's route
+ * depth, and GitHub Pages serves any number of leading slashes as a live 200
+ * without normalising or redirecting: 1500 of them in front of a project page
+ * is still that page, and the chain is then 1504 paths and 9024 assignments —
+ * median 177 ms per sweep, slowest of 7 runs 353 ms, measured in headless
+ * Chromium on the built page served as `pkrason.de`. `denyConsent` runs the
+ * cleanup twice, so that is roughly a third of a second of blocked main thread
+ * for someone who was handed such a URL. Nothing is deleted wrongly there —
+ * every one of those paths really does path-match the document — and capping
+ * the chain is not the fix, because a truncated chain brings back exactly the
+ * silent no-ops the enumeration exists to remove. So: linear in
+ * name × domain × path, and a much wider name pattern, or a cap on this chain,
+ * would each be a different claim.
  *
  * Three things stay out of reach, none of them fixable here:
  *
@@ -280,7 +316,9 @@ function isClarityName(name) {
  *     reachable. Today the callers are the decline/withdraw paths only (see
  *     `denyConsent`, `watchOtherTabs`) — PR #45 adds `applyStoredDecision` as a
  *     per-page-view caller, and until it lands this limit holds for every path
- *     other than the one the visitor declined on.
+ *     other than the ones the open tabs were sitting on when the decision was
+ *     made — on the cross-tab path each tab sweeps its own chain, not only the
+ *     one that was clicked in.
  *   - A path carrying a character that would end the attribute early, which is
  *     dropped rather than emitted; see `UNSAFE_IN_COOKIE_PATH`.
  *   - An HttpOnly cookie, and the floor does not help there either: a
@@ -403,9 +441,10 @@ export function grantConsent() {
  * Records a refusal and tears down whatever Clarity already stored. The
  * `consentv2 … denied` call is what makes Clarity delete `_clck`/`_clsk`
  * itself; the explicit cleanup covers every other `_cl` entry in either web
- * storage area and on any path of this document — `_cltk` is the one that was
- * measured, not the extent of it — and the case where Clarity was never loaded
- * in this page view but left storage behind from an earlier one.
+ * storage area and on every path of this document that a delete can address
+ * (see `clearClarityCookies`) — `_cltk` is the one that was measured, not the
+ * extent of it — and the case where Clarity was never loaded in this page view
+ * but left storage behind from an earlier one.
  *
  * This does not stop Clarity for the current page view — the library restarts
  * itself in lean mode instead of shutting down, and the injected script tag
@@ -518,7 +557,8 @@ export function watchOtherTabs() {
  * lives to day 665 while their consent stopped counting on day 365. Deleting
  * them here would be a second promise about storage that the privacy policy
  * does not currently make; it is a question for that text, not for this file,
- * and PRI-224 carries both halves.
+ * and PRI-236 carries it. The deletion half is PR #45, which calls this
+ * cleanup on every page view without an accepted consent.
  */
 export function applyStoredDecision() {
   if (readDecision() === GRANTED) {
