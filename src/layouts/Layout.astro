@@ -1,6 +1,7 @@
 ---
 import Navigation from '../components/Navigation.astro';
 import Footer from '../components/Footer.astro';
+import ConsentBanner from '../components/ConsentBanner.astro';
 import '../styles/global.css';
 
 // Self-hosted fonts (no external requests to Google)
@@ -83,11 +84,10 @@ const jsonLd = {
     <!-- JSON-LD Schema -->
     <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
 
-    <!-- Microsoft Clarity (heatmaps & session recordings) -->
-    <script>
-      import Clarity from '@microsoft/clarity';
-      Clarity.init('wu9fh588ka');
-    </script>
+    {/* Nothing may reference Microsoft Clarity from the head: a static import
+        or even a preconnect would be a request before consent. It loads only
+        after an opt-in, through the dynamic import in src/scripts/consent.js
+        that ConsentBanner drives. */}
   </head>
   <body>
     <a href="#main" class="skip-link">Skip to content</a>
@@ -96,6 +96,7 @@ const jsonLd = {
       <slot />
     </main>
     <Footer />
+    <ConsentBanner />
     <script>
       import '../scripts/reveal.js';
     </script>
