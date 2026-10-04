@@ -495,7 +495,7 @@ jobs:
             'token|rounded-sm|rounded-xs|'
             'token|blur-sm|blur-xs|'
             'token|drop-shadow-sm|drop-shadow-xs|'
-            'raw|theme(|CSS-Variable direkt, z. B. var(--color-…)|'
+            'raw|theme(|bei Farben var(--color-…); bei fontFamily @apply font-mono, in <style> ohne @reference nur der literale Stack — --font-mono gibt es nicht|'
             'prefix|bg-opacity-|Slash-Syntax, z. B. bg-stone-900/50|'
             'prefix|text-opacity-|Slash-Syntax, z. B. text-stone-900/50|'
             'prefix|border-opacity-|Slash-Syntax, z. B. border-stone-900/50|'
