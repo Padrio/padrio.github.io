@@ -49,7 +49,11 @@ const projectJsonLd = {
   "@type": "SoftwareApplication",
   "name": project.data.title,
   "description": project.data.description,
-  ...(project.data.image && { "image": `https://pkrason.de${project.data.image}` }),
+  // Resolved the same way as og:image in Layout.astro, so both carry the byte-identical
+  // URL (rule 9). String interpolation would not: new URL() percent-encodes the path.
+  ...(project.data.image && {
+    "image": new URL(project.data.image, Astro.site || 'https://pkrason.de').href,
+  }),
   "url": `https://pkrason.de/projects/${project.id}`,
   "datePublished": project.data.date,
   "author": {
