@@ -4,15 +4,36 @@ import Footer from '../components/Footer.astro';
 import ConsentBanner from '../components/ConsentBanner.astro';
 import '../styles/global.css';
 
-// Self-hosted fonts (no external requests to Google)
-import '@fontsource/inter/400.css';
-import '@fontsource/inter/500.css';
-import '@fontsource/inter/600.css';
-import '@fontsource/inter/700.css';
-import '@fontsource/inter/800.css';
-import '@fontsource/jetbrains-mono/400.css';
-import '@fontsource/jetbrains-mono/500.css';
-import '@fontsource/jetbrains-mono/600.css';
+// Self-hosted fonts (no external requests to Google).
+//
+// Nur die latin-Subsets. Die Default-Einstiegspunkte (`inter/400.css`) ziehen alle
+// Subsets des Gewichts in das render-blockierende CSS: 53 @font-face-Regeln, darunter
+// Kyrillisch, Griechisch und Vietnamesisch, die auf dieser Seite (lang="en") kein
+// Zeichen braucht. Drei JetBrains-Mono-Subsets liegen ausserdem unter Vites
+// assetsInlineLimit von 4096 B und landen deshalb als Base64-Data-URI *im* CSS.
+//
+// Der Hebel ist ausschliesslich die CSS-Groesse, nicht die Zahl der Font-Downloads:
+// unicode-range verhindert korrekt, dass ein ungenutztes Subset geholt wird — beide
+// Faelle laden dieselben sieben woff2 —, aber es kann die Bytes eines Data-URI nicht
+// aus dem Stylesheet entfernen. Die reisen unbedingt mit, auch wenn der Browser die
+// Regel anschliessend nie benutzt.
+//
+// Die latin-*-Einstiegspunkte tragen bewusst *keine* unicode-range (so liefert
+// Fontsource sie aus). Deshalb laesst sich `latin` nicht zusammen mit `latin-ext`
+// importieren: ohne Range wuerde die zweite Deklaration die erste fuer alle Zeichen
+// verdecken. Es ist entweder/oder. Folge fuer den Inhalt: ein Zeichen aus
+// Latin-Extended-A rendert dann per Zeichen-Fallback aus einer System-Schrift statt
+// aus Inter — sichtbar, aber nicht kaputt. Das gebaute HTML enthaelt heute kein
+// solches Zeichen; einziges Zeichen ausserhalb von latin ist der Pfeil U+2192, und
+// der lag in keiner der 53 vorherigen Ranges, fiel also schon vorher zurueck.
+import '@fontsource/inter/latin-400.css';
+import '@fontsource/inter/latin-500.css';
+import '@fontsource/inter/latin-600.css';
+import '@fontsource/inter/latin-700.css';
+import '@fontsource/inter/latin-800.css';
+import '@fontsource/jetbrains-mono/latin-400.css';
+import '@fontsource/jetbrains-mono/latin-500.css';
+import '@fontsource/jetbrains-mono/latin-600.css';
 
 interface Props {
   title: string;
