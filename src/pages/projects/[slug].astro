@@ -103,13 +103,37 @@ const projectJsonLd = {
       )}
     </div>
 
-    <!-- Body: prose + sticky sidebar -->
+    <!-- Body: prose + sidebar -->
     <div class="max-w-content mx-auto px-4 sm:px-7 pt-12 lg:pt-16 lg:grid lg:grid-cols-[minmax(0,1fr)_280px] lg:gap-16 lg:items-start">
       <div class="prose-project">
         <Content />
       </div>
 
-      <aside class="mt-12 lg:mt-0 lg:sticky lg:top-[92px]">
+      {/*
+        Deliberately NOT stuck to the viewport from lg up. It used to be, with a
+        92px offset; that was removed for PRI-122 (board decision 2026-10-04).
+
+        The card is 470-844px tall depending on the project, so it outgrew the
+        window it was pinned inside (viewport height minus the offset). At
+        1024x768 four of its eleven links were entirely obscured at the moment
+        they took focus and only six were usable at all — a WCAG 2.2 SC 2.4.11
+        (Focus Not Obscured) failure. A pinned box snaps back to its viewport
+        position, which is why neither the browser's own scroll-on-focus nor the
+        bottom scroll padding the consent banner sets on the root element could
+        bring those links into view. Without the pinning both work: 11 of 11
+        links usable across all four measured viewports, banner open or answered.
+
+        The alternative was a height cap plus an inner scroll container. It fixes
+        the same links but leaves the banner's share of the problem in place and
+        costs a second scrollbar; the board chose against it.
+
+        Two traps this comment avoids on purpose. It is an Astro expression
+        comment, not an HTML comment, so it does not ship in the rendered page —
+        and it does not spell out the removed utility classes, because Tailwind
+        scans comment prose for candidates and would keep emitting their now
+        unused CSS.
+      */}
+      <aside class="mt-12 lg:mt-0">
         <div class="bg-white border border-stone-200 rounded-2xl p-6 shadow-[0_1px_3px_rgba(28,25,23,0.04)]">
           <div class="flex items-center gap-2 text-[13.5px] text-stone-500">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
