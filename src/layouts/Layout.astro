@@ -24,16 +24,23 @@ interface Props {
 // Default OG image: dedicated 1200x630 share card — the ratio the platforms crop to.
 // PNG rather than WebP because WebP preview support differs across platforms.
 // Override per page with the image prop.
+const DEFAULT_OG_IMAGE = '/images/og-image.png';
 const {
   title,
   description = 'Solutions Architect & backend engineer — architecture, test harnesses and AI agent teams for systems that have to be provably correct.',
-  image = '/images/og-image.png',
+  image,
   lang = 'en',
 } = Astro.props;
 const ogLocales: Record<string, string> = { en: 'en_US', de: 'de_DE' };
 // Look up on the normalized base subtag so regional tags (de-DE, DE) map to their locale
 const ogLocale = ogLocales[lang.split('-')[0].toLowerCase()] ?? ogLocales.en;
-const canonicalURL = new URL(Astro.url.pathname, Astro.site || 'https://pkrason.de');
+const siteURL = Astro.site || 'https://pkrason.de';
+const canonicalURL = new URL(Astro.url.pathname, siteURL);
+// og:image and twitter:image must be absolute: the crawlers that read them have no
+// document base to resolve a root-relative path against. Same pattern as canonicalURL.
+// An already absolute image prop passes through new URL() unchanged; a blank one falls
+// back to the default, because new URL('', siteURL) would ship the site root as the card.
+const imageURL = new URL(image?.trim() || DEFAULT_OG_IMAGE, siteURL);
 
 // JSON-LD Schema
 const jsonLd = {
@@ -71,7 +78,7 @@ const jsonLd = {
     <meta property="og:url" content={canonicalURL} />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
-    <meta property="og:image" content={image} />
+    <meta property="og:image" content={imageURL} />
     <meta property="og:locale" content={ogLocale} />
 
     <!-- Twitter -->
@@ -79,7 +86,7 @@ const jsonLd = {
     <meta name="twitter:url" content={canonicalURL} />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
-    <meta name="twitter:image" content={image} />
+    <meta name="twitter:image" content={imageURL} />
 
     <!-- JSON-LD Schema -->
     <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
