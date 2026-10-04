@@ -39,6 +39,25 @@ const CHANGE_EVENT = 'pk-consent-change';
 // leave the number alone, and whether the old answers still cover the new
 // description is not a call to make in here.
 //
+// Two consequences of a bump that the banner does not show, both of them a
+// result of `applyStoredDecision` reconciling storage with the decision. Note
+// for whoever edits this block next: Tailwind scans this file's comment prose
+// for class candidates, so a bare utility word in here emits a dead rule into
+// every page's CSS — write around it rather than letting the word stand alone:
+//
+//   - Every stored record stops counting at the same moment, so the first page
+//     view of every visitor who had consented clears their Clarity cookies and
+//     session token — not just the ones whose record had lapsed on its own. See
+//     `applyStoredDecision`.
+//   - Every document still open from the previous build reloads once, as soon as
+//     a visitor answers the new question in another tab. That document's
+//     `readDecision` runs the old number, so it reads the new record as no
+//     decision, and `enforceDecision` tears it down — including the `_clck` the
+//     answering tab has just written. The outcome is right and self-healing (new
+//     purpose version, new identifier), but it is a reload in every open tab and
+//     a short-lived identifier change in the answering one, which is not a thing
+//     to meet by surprise during a deploy (PRI-233, S&O-R2-3).
+//
 // It is a plain integer and the only thing that has to be edited for a bump —
 // the comparison below is an equality check, so there is no ordering to get
 // wrong.
@@ -248,15 +267,96 @@ export function denyConsent() {
   });
 }
 
+/**
+ * Brings this document in line with `decision`: a tracker that is running
+ * without a `granted` decision gets its storage cleared and the document
+ * reloaded, because the injected script tag cannot be unloaded.
+ *
+ * Takes the decision rather than reading it, so a caller that has already read
+ * it keeps deciding on a single read — see the `storage` handler below.
+ *
+ * Returns whether a reload was requested. Every caller that has work after the
+ * call has to treat `true` as "stop here": a reload is asynchronous, so the
+ * document is still live and fully scriptable afterwards, and anything that
+ * runs on would be acting on a state that is about to be thrown away. What that
+ * costs concretely, on the one path that has work left: the `storage` handler
+ * below would run on into the broadcast, and on /privacy/ the status line flips
+ * to "switched off" and the withdraw button disappears while the reload is still
+ * pending — a document reporting a decision it has not yet been rebuilt under.
+ *
+ * Anything that is not an accepted `granted` stops the tracker, whether it is a
+ * decision or the absence of one. The states that reach here with Clarity
+ * running and no accepted decision are all deliberately reloaded. The list is
+ * open — it is the complement of one narrow condition, not an enumeration that
+ * can be completed — and these are the ones known to be reachable:
+ *
+ *   - A grant that could not be stored, because `setItem` threw — the same state
+ *     `storeDecision`'s catch and `grantConsent`'s ordering rationale are about.
+ *     The visitor did answer, and Back nevertheless becomes a full reload with
+ *     the banner back up. Honouring that grant would need a second source of
+ *     truth for the decision beside the store, and fail-closed is the better
+ *     trade for a tracker. Measured and accepted, not missed (PRI-231, S1).
+ *   - A consent that lapsed while the document stayed open: `readDecision`
+ *     enforces a version and a maximum age, so a document can outlive its own
+ *     record. Reloading is exactly right there, and it is also the only thing
+ *     that re-asks.
+ *   - A record dated in the future, which `readDecision` rejects as well. The
+ *     clock moved backwards after the decision was stored; nothing lapsed.
+ *   - A `CONSENT_VERSION` bump that landed while this document was open, which
+ *     makes an answer given in another tab arrive here as no decision. See the
+ *     bump block at the top of this file.
+ *   - An emptied store: another tab ran `localStorage.clear()` or removed the
+ *     key. That is not an answer, and ConsentBanner deliberately keeps the
+ *     banner up for it rather than reading it as a refusal — but with Clarity
+ *     already running in this document, "no accepted decision" is the only safe
+ *     reading, so it reloads like any other withdrawal (PRI-230, B1).
+ */
+function enforceDecision(decision) {
+  if (decision === GRANTED || !isClarityLoaded()) return false;
+  clearClarityStorage();
+  window.location.reload();
+  return true;
+}
+
 let watching = false;
 
 /**
- * Propagates a decision made in another tab into this one.
+ * Propagates a decision this document did not see being made into it. Two ways
+ * it can miss one, and they are not covered to the same depth — the second
+ * bullet says where it stops.
  *
- * `onDecisionChange` listens for a `document` event, which never crosses a tab
- * boundary, so without this a visitor who withdraws consent in one tab keeps
- * uploading from every other tab that still has the page open — the cookies
- * are gone, but the running tracker in the other document keeps sending.
+ * **Another tab.** `onDecisionChange` listens for a `document` event, which
+ * never crosses a tab boundary, so without this a visitor who withdraws consent
+ * in one tab keeps uploading from every other tab that still has the page open
+ * — the cookies are gone, but the running tracker in the other document keeps
+ * sending.
+ *
+ * **The back/forward cache.** A frozen document receives no `storage` event at
+ * all, and it is restored with its JavaScript state untouched: script tag still
+ * in the DOM, `clarityLoad` still set. Clarity itself is bfcache-compatible — as
+ * of `scripts.clarity.ms/0.8.70/clarity.js`, the engine script Clarity serves at
+ * runtime and not the `@microsoft/clarity` wrapper package that `package.json`
+ * pins: it registers `pagehide`/`visibilitychange` and neither `unload` nor
+ * `beforeunload`. That was read off that script in PRI-198 and is not measured
+ * here, because the engine is never fetched in this workspace — so a page with
+ * Clarity running really does get frozen rather than discarded, and on `pageshow`
+ * it has to re-read the decision instead of trusting the one it loaded with.
+ *
+ * This second path is narrower than the first, deliberately: it re-reads the
+ * decision and enforces it, which only acts in the withdrawal direction and
+ * only while Clarity is running. A restored document that missed a decision in
+ * the *other* direction — a grant — stays exactly as it was and gets no
+ * `CHANGE_EVENT`, so its banner or status line is stale until the next
+ * navigation, and a click in that stale banner overwrites the decision from the
+ * other tab. Measured. An emptied store is not a second example of that
+ * direction, even though it leaves no decision behind: in a document with
+ * Clarity running it reloads like any other withdrawal, and only a document that
+ * never loaded Clarity stays as it was. See `enforceDecision`. Nothing
+ * regresses: before this handler existed
+ * a restored document was stale in every direction. Closing the mirror
+ * direction is a separate question — the `denied` → `granted` route on
+ * /privacy/ is with QA in PRI-204 — and widening this handler into it would be
+ * a scope change, not a fix.
  *
  * A withdrawal therefore reloads the other tab: the injected script tag cannot
  * be unloaded, so a fresh document is the only thing that reliably stops it.
@@ -266,7 +366,8 @@ let watching = false;
  * but those events only reach documents that share the same `sessionStorage`
  * (same tab, so iframes; this site has none), and the `_cltk` key would be
  * rejected by the key guard below anyway. No load path writes `localStorage`
- * either: `applyStoredDecision` only reads.
+ * either: `applyStoredDecision` reads it and writes only cookies and
+ * `sessionStorage`, which the same two guards discard.
  *
  * The spec excludes the writing tab from delivery, so the tab the visitor
  * clicked in does not run any of this a second time. A browser that delivers to
@@ -290,14 +391,11 @@ export function watchOtherTabs() {
     } catch {
       return;
     }
-    // One read for all three branches below: they run in the same task and have
-    // to agree on what the other tab left behind.
+    // One read for everything below — the enforce call, the grant branch and
+    // the broadcast. They run in the same task and have to agree on what the
+    // other tab left behind.
     const decision = readDecision();
-    if (decision !== GRANTED && isClarityLoaded()) {
-      clearClarityStorage();
-      window.location.reload();
-      return;
-    }
+    if (enforceDecision(decision)) return;
     // A grant has to take effect here before it is announced, or the status
     // line on /privacy/ reports a tracker this document never loaded. Same
     // rule as `grantConsent`: nothing is announced before it is true. The
@@ -312,6 +410,28 @@ export function watchOtherTabs() {
     // which it cannot do if the event never arrives.
     document.dispatchEvent(new CustomEvent(CHANGE_EVENT));
   });
+
+  window.addEventListener('pageshow', (event) => {
+    // Only a restore. The stored decision and `isClarityLoaded()` agree at
+    // module evaluation, because `applyStoredDecision()` has just run — but
+    // `pageshow` fires after `load`, and in between the document is interactive
+    // and may be waiting seconds on images and fonts. A grant taken in that
+    // window whose `setItem` throws leaves `clarityLoad` set with no accepted
+    // decision, and without this guard the *initial* `pageshow` would then
+    // reload and throw that grant away. That window is what the guard carries;
+    // it is not merely a fallback for an agreement that holds (PRI-232, B3).
+    //
+    // What keeps ordinary navigation from reloading is the
+    // `decision === GRANTED` short-circuit in `enforceDecision`, not this guard
+    // — measured: removing the guard costs zero extra loads across three
+    // navigations in each of the three decision states. That is the opposite of
+    // the claim that was in here before. It does not extend to the window above,
+    // which is a fourth state those three runs did not cover.
+    //
+    // The return value is ignored because nothing follows it; see
+    // `enforceDecision` on why any caller with work left must not.
+    if (event.persisted) enforceDecision(readDecision());
+  });
 }
 
 /**
@@ -320,20 +440,38 @@ export function watchOtherTabs() {
  * unreadable store, a corrupted value, a consent for an older version of the
  * purpose and an expired one all do nothing.
  *
- * What it does not do is delete what an earlier, now lapsed, consent already
- * let Clarity store. Nothing reads or sends those entries while there is no
- * accepted decision. Their lifetimes do not run with the consent, though:
- * `_clck` is rewritten with a fresh 365 days on the first visit of each new
- * day (measured — a second visit on the same day leaves it alone), while the
- * record above is stamped once at the decision and never moves. Someone who
- * consents on day 0 and keeps visiting until day 300 has an identifier that
- * lives to day 665 while their consent stopped counting on day 365. Deleting
- * them here would be a second promise about storage that the privacy policy
- * does not currently make; it is a question for that text, not for this file,
- * and PRI-224 carries both halves.
+ * Everything that is not an accepted `granted` also reconciles storage with the
+ * decision, on every single page view. That is deliberately broader than "undo
+ * the last revoke": it collects any Clarity cookie that outlived a cleanup
+ * which failed, raced a navigation or never ran, whatever left it behind. Cost
+ * is a handful of `document.cookie` assignments per page view, all no-ops once
+ * the jar is empty.
+ *
+ * Two consequences of that breadth, both of which were open questions in their
+ * own right before this branch:
+ *
+ *   - It is what makes the promise on /privacy/ — that a withdrawal deletes any
+ *     existing copy — true for longer than the moment of the click.
+ *   - It also deletes what an earlier, now lapsed, consent let Clarity store.
+ *     Those lifetimes do not run with the consent: `_clck` is rewritten with a
+ *     fresh 365 days on the first visit of each new day (measured — a second
+ *     visit on the same day leaves it alone), while the record above is stamped
+ *     once at the decision and never moves. A visitor who consents on day 0 and
+ *     keeps visiting until day 300 used to carry an identifier to day 665 while
+ *     their consent stopped counting on day 365; the first page view after the
+ *     record lapses now clears it.
+ *
+ * What this file cannot settle is the wording that goes with the second one.
+ * The privacy policy ties the deletion to declining or withdrawing and does not
+ * describe the "never asked, or lapsed" state that is also cleared here, so the
+ * text is narrower than the code. Widening it is a rule-7 board question and
+ * belongs to PRI-236, which carries it as a board card; the deletion itself does
+ * not wait on it, because the policy promises less than happens, not more.
  */
 export function applyStoredDecision() {
   if (readDecision() === GRANTED) {
     loadClarity();
+  } else {
+    clearClarityStorage();
   }
 }
