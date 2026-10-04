@@ -188,7 +188,7 @@ import Layout from '../layouts/Layout.astro';
           We have configured Clarity so that it does not grant Microsoft's advertising storage. It therefore does not set advertising cookies and does not link your visit to a Microsoft advertising profile. If you decline, or withdraw your consent, none of these entries is stored, and any existing copy is deleted.
         </p>
         <p class="text-stone-700 mb-4">
-          Independently of your choice, we store your consent decision itself in your browser's local storage under the key <code>pk-consent-analytics</code>, so that we do not have to ask you again on every page. This entry contains only the value <code>granted</code> or <code>denied</code>, is never transmitted anywhere, and is strictly necessary to provide the function you requested (§ 25 para. 2 no. 2 TDDDG). You can remove it at any time by clearing this site's data in your browser.
+          Independently of your choice, we store your consent decision itself in your browser's local storage under the key <code>pk-consent-analytics</code>, so that we do not have to ask you again on every page. The entry holds three values separated by colons: your decision (<code>granted</code> or <code>denied</code>), a version number that ties your decision to the description of Microsoft Clarity given above, and the time at which you made it, as a Unix timestamp in milliseconds. It is never transmitted anywhere, and storing and reading it is strictly necessary to provide the function you requested — to honour your decision without asking you again (§ 25 para. 2 no. 2 TDDDG). We rely on it for at most <strong>365 days</strong>, and only for the version it was given against: once it is older than that, or once we have changed what Clarity collects or where it is transmitted and raised the version number accordingly, it stops counting as an answer — the banner asks you again, and until you answer, Clarity is not loaded and nothing is sent. This time limit applies to a refusal in exactly the same way as to a consent. An entry that has stopped counting is not deleted automatically; it is replaced as soon as you answer again, and you can remove it at any time by clearing this site's data in your browser.
         </p>
 
         <h4 class="text-lg font-semibold text-stone-800 mb-3 mt-6">Data Transfer to the USA</h4>
@@ -220,7 +220,7 @@ import Layout from '../layouts/Layout.astro';
             run the script yet — and filling an empty live region on load makes
             screen readers announce it over the page title. The script now only
             replaces it when an actual decision exists. */}
-        <p class="text-stone-700 mb-4 mt-4" id="clarity-consent-state" aria-live="polite">You have not been asked yet, or you cleared your choice. Microsoft Clarity is switched off.</p>
+        <p class="text-stone-700 mb-4 mt-4" id="clarity-consent-state" aria-live="polite">You have not been asked yet, or your earlier answer no longer applies — you cleared it, it is more than 365 days old, or it was given for an earlier version. Microsoft Clarity is switched off.</p>
         <p class="text-stone-700 mb-4">
           You can also delete the cookies at any time in your browser settings, or prevent them from being stored in the first place. Withdrawing your consent does not affect the lawfulness of the processing that took place before you withdrew it (Art. 7 para. 3 GDPR).
         </p>
@@ -289,7 +289,7 @@ import Layout from '../layouts/Layout.astro';
     // ever displays it. Keep it word-for-word identical with the paragraph.
     none:
       stateLine?.textContent?.trim() ||
-      'You have not been asked yet, or you cleared your choice. Microsoft Clarity is switched off.',
+      'You have not been asked yet, or your earlier answer no longer applies — you cleared it, it is more than 365 days old, or it was given for an earlier version. Microsoft Clarity is switched off.',
   };
 
   const render = (decision) => {

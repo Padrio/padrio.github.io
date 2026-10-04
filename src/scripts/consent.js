@@ -5,11 +5,62 @@
 // `@microsoft/clarity` lands in its own chunk that is never fetched. Every
 // failure path in here resolves to "no tracking": an unreadable localStorage,
 // an unknown stored value and a failed import all leave Clarity unloaded.
+//
+// A stored consent is also bound to a version of the purpose and has a
+// lifetime; both are enforced in one place, in `readDecision` — see there.
 
 const STORAGE_KEY = 'pk-consent-analytics';
 const GRANTED = 'granted';
 const DENIED = 'denied';
 const CHANGE_EVENT = 'pk-consent-change';
+
+// A consent is only ever consent to one particular description of the purpose.
+// That description is not in this file: it is the Microsoft Clarity section of
+// `src/pages/privacy.astro`, and the paragraph there about this entry promises
+// the visitor that the number ties their decision to it. The promise runs both
+// ways, and the board approved it in that form:
+//
+//   - Bump this whenever what Clarity collects, or where it is transmitted,
+//     changes. Every record written under an older number stops counting as an
+//     answer, so the banner asks again against the new description. Leaving the
+//     number alone across such a change puts a commitment in the privacy policy
+//     that this code does not keep.
+//   - Bump it for nothing else. Not for a refactor, not for a fix in here. The
+//     sentence in the policy names collection and transmission as the reason,
+//     so a bump for any other reason makes that sentence inaccurate — and it
+//     throws away every visitor's answer for no change they could notice.
+//
+// The trigger above is deliberately narrower than the description it binds to.
+// That section also carries the Clarity project id, the `ad_Storage` setting,
+// the cookie and lifetime list, the basis for the US transfer and the storage
+// period — and a change to the storage period or the transfer basis moves the
+// description without changing collection or transmission. Such a change is a
+// question for the board, not automatically a bump: the rule above says to
+// leave the number alone, and whether the old answers still cover the new
+// description is not a call to make in here.
+//
+// It is a plain integer and the only thing that has to be edited for a bump —
+// the comparison below is an equality check, so there is no ordering to get
+// wrong.
+const CONSENT_VERSION = 1;
+// 365 days. A consent that never lapses is not informed consent about the
+// current state of the site, so a record older than this stops counting as an
+// answer in exactly the same way an older version does. It applies to a
+// refusal too, deliberately: the recorded answer is an answer to one version
+// of one question, and that is as true of "no" as of "yes". The alternative —
+// a refusal that is remembered forever — reads as more respectful but silently
+// means the question can never be put again, not even when the purpose
+// changes under a new version. Re-asking once a year is the same cadence in
+// both directions.
+//
+// The number itself is promised to the visitor in three places in
+// `src/pages/privacy.astro`: the paragraph about this entry ("at most 365
+// days") and the two byte-identical status-line copies for "no decision"
+// ("more than 365 days old"), in the markup and in that page's own script.
+// Shortening or lengthening it breaks all three, needs its own rule-7 board
+// approval for the changed wording, and has to keep the two status-line copies
+// byte-equal. Nothing in the build checks any of that.
+const CONSENT_MAX_AGE_MS = 365 * 24 * 60 * 60 * 1000;
 
 const CLARITY_PROJECT_ID = 'wu9fh588ka';
 // The two cookies Clarity actually writes on this domain. The three names in
@@ -24,23 +75,57 @@ const CLARITY_SESSION_KEYS = ['_cltk'];
 export { GRANTED };
 
 /**
- * The stored decision, or null when there is none. localStorage access throws
- * in some private-browsing configurations, and the value can be anything a
- * visitor puts there; both cases count as "no decision", which keeps the gate
- * closed rather than guessing.
+ * The stored decision, or null when there is none that still counts.
+ *
+ * The stored record is `<decision>:<version>:<millisecond timestamp>` and is
+ * accepted only in exactly that shape, with the current version and inside the
+ * maximum age. Everything else is "no decision", which leaves the gate closed
+ * and brings the banner back: an unreadable store (localStorage access throws
+ * in some private-browsing configurations), a record from an older version of
+ * the purpose, an expired one, and any value a visitor or another script put
+ * there. That is one rule, not four — the only accepted input is a record in
+ * the shape this module writes, recently, for this version — and it is what
+ * makes the privacy-friendly outcome the default for every unforeseen value as
+ * well. Shape is all it can check: localStorage has no integrity, so any
+ * script on this origin and anyone with the console can write an accepted
+ * record. That is not a weakness of the gate — a client-side check cannot do
+ * better, and such a script could load the tracker directly anyway.
+ *
+ * `split` with a length check rather than a prefix test: `startsWith(GRANTED)`
+ * would accept `granted:2:…`, and a bare `granted` left over from the
+ * unversioned format has one part, not three, so it is rejected without a
+ * special case.
  */
 export function readDecision() {
+  let stored;
   try {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    return stored === GRANTED || stored === DENIED ? stored : null;
+    stored = window.localStorage.getItem(STORAGE_KEY);
   } catch {
     return null;
   }
+  if (typeof stored !== 'string') return null;
+  const parts = stored.split(':');
+  if (parts.length !== 3) return null;
+  const [decision, version, recordedAt] = parts;
+  if (decision !== GRANTED && decision !== DENIED) return null;
+  if (version !== String(CONSENT_VERSION)) return null;
+  // Digits only, and the whole string. `Number()` is far too generous to gate
+  // an expiry on: it reads '' as 0, ' 12 ' as 12, '1e99' as 1e99 and '0x10' as
+  // 16, so a value that is not a timestamp at all would get an age computed
+  // for it — and `1e99` would be an age that never expires.
+  if (!/^\d+$/.test(recordedAt)) return null;
+  const age = Date.now() - Number(recordedAt);
+  // A record dated in the future is not accepted either. It cannot have been
+  // written by this module on this clock, so it is either corrupted or the
+  // clock moved backwards; both are "ask again" rather than "trust a stamp
+  // that will not expire for as long as it is ahead".
+  if (age < 0 || age > CONSENT_MAX_AGE_MS) return null;
+  return decision;
 }
 
 function storeDecision(value) {
   try {
-    window.localStorage.setItem(STORAGE_KEY, value);
+    window.localStorage.setItem(STORAGE_KEY, `${value}:${CONSENT_VERSION}:${Date.now()}`);
   } catch {
     // Nothing to do: without persistence the decision simply is not
     // remembered, so the banner asks again on the next page view. That is the
@@ -231,8 +316,21 @@ export function watchOtherTabs() {
 
 /**
  * Honours a decision made in an earlier page view. Only a stored `granted`
- * loads Clarity — no decision, a refusal, an unreadable store and a corrupted
- * value all do nothing.
+ * that `readDecision` still accepts loads Clarity — no decision, a refusal, an
+ * unreadable store, a corrupted value, a consent for an older version of the
+ * purpose and an expired one all do nothing.
+ *
+ * What it does not do is delete what an earlier, now lapsed, consent already
+ * let Clarity store. Nothing reads or sends those entries while there is no
+ * accepted decision. Their lifetimes do not run with the consent, though:
+ * `_clck` is rewritten with a fresh 365 days on the first visit of each new
+ * day (measured — a second visit on the same day leaves it alone), while the
+ * record above is stamped once at the decision and never moves. Someone who
+ * consents on day 0 and keeps visiting until day 300 has an identifier that
+ * lives to day 665 while their consent stopped counting on day 365. Deleting
+ * them here would be a second promise about storage that the privacy policy
+ * does not currently make; it is a question for that text, not for this file,
+ * and PRI-224 carries both halves.
  */
 export function applyStoredDecision() {
   if (readDecision() === GRANTED) {
