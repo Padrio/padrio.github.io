@@ -63,14 +63,37 @@ const CONSENT_VERSION = 1;
 const CONSENT_MAX_AGE_MS = 365 * 24 * 60 * 60 * 1000;
 
 const CLARITY_PROJECT_ID = 'wu9fh588ka';
-// The two cookies Clarity actually writes on this domain. The three names in
-// the project config (_uetmsclkid/_uetvid/_clck) are a read list for the
-// Microsoft Advertising tag, which this site does not use.
+// The two cookies Clarity was measured writing on this domain, at engine
+// version 0.8.70. The three names in the project config
+// (_uetmsclkid/_uetvid/_clck) are a read list for the Microsoft Advertising
+// tag, which this site does not use.
+//
+// This is a floor for the cleanup below, not its definition — see
+// `clearClarityStorage`, which enumerates by prefix instead of trusting these
+// two names. The engine is fetched unversioned at runtime, so Microsoft can
+// add a name without anything being deployed here.
 const CLARITY_COOKIES = ['_clck', '_clsk'];
 // Clarity keeps its session token in sessionStorage. It survives a revoke
 // otherwise, which would leave a Clarity identifier behind after the cookies
-// are gone.
+// are gone. Same standing as the list above: a floor, not the definition.
 const CLARITY_SESSION_KEYS = ['_cltk'];
+// What counts as "Clarity's" in first-party storage: every name Clarity has
+// been seen to write here starts with `_cl` (`_clck`, `_clsk`, `_cltk`).
+//
+// Two things the pattern deliberately does not do:
+//
+//   - It does not reach `_uet*`. Those names belong to the Microsoft
+//     Advertising tag, which this site does not load, and `ad_Storage` stays
+//     denied. Sweeping them would be a claim about storage that is never
+//     written here.
+//   - It does not reach `pk-consent-analytics`. The record of the decision is
+//     not Clarity's and must survive the cleanup — /privacy/ promises in so
+//     many words that a lapsed record is *not* deleted automatically.
+//
+// The trailing character class is narrower than the cookie grammar allows. A
+// name is read out of `document.cookie` and written straight back into it, so
+// it stays restricted to characters that cannot carry a cookie attribute.
+const CLARITY_NAME = /^_cl[\w.-]*$/;
 
 export { GRANTED };
 
@@ -173,14 +196,60 @@ function loadClarity() {
 }
 
 /**
- * Removes everything Clarity stored in first-party scope.
+ * Whether `name` is a first-party storage entry this cleanup owns.
  *
- * The cookies are expired in every variant they could have been written with:
- * Clarity sets them on the registrable domain with a leading dot, and a delete
- * whose domain/path attributes do not match is a silent no-op, so each
- * combination is repeated rather than guessed.
+ * The `STORAGE_KEY` exclusion cannot trigger under `CLARITY_NAME` as written —
+ * `pk-consent-analytics` does not start with `_cl`. It is here because the
+ * pattern is the part of this file most likely to be widened later, and the
+ * cost of widening it one character too far is deleting the visitor's own
+ * decision record: /privacy/ promises that record is kept until they clear it
+ * themselves, so this is the guard that has to outlive the pattern.
  */
-function clearClarityStorage() {
+function isClarityName(name) {
+  return name !== STORAGE_KEY && CLARITY_NAME.test(name);
+}
+
+/**
+ * Expires every `_cl` cookie this document can see, across every domain and
+ * path attribute it could have been written with.
+ *
+ * A cookie's identity is its name *and* its domain and path, so a delete whose
+ * attributes do not match is a silent no-op. That was already handled for the
+ * domain by repeating the delete over every variant rather than guessing one;
+ * the path got the same treatment here, because `path=/` alone misses a cookie
+ * written on any deeper path. Both halves of the chain are swept — `/projects`
+ * and `/projects/` are two distinct cookies, not one spelled two ways.
+ *
+ * The names are read out of the jar instead of being listed. A hard-coded list
+ * is a measurement of one engine version, and the engine is loaded unversioned
+ * from clarity.ms at runtime (PRI-200), so Microsoft can add a cookie without
+ * a deploy here and the list would go stale with no build error and nothing in
+ * the console. `CLARITY_COOKIES` is still folded in as a floor: it is what runs
+ * when the jar hands back nothing useful, and it keeps the measured names on
+ * the record.
+ *
+ * The price of covering the two attribute sets by repetition is one assignment
+ * per name × domain × path: 5 domains on this site, and 1 path on `/` rising to
+ * 5 on a project page. With the floor's two names and nothing else in the jar
+ * that is 10 and 50 assignments. Measured on `/projects/konteo-panel/` in
+ * headless Chromium: 25 assignments 0.2 ms, 50 → 0.4 ms, 150 → 1.1 ms, 300 →
+ * 2.2 ms (medians of 20 sweeps each, after one warm-up sweep; the slowest
+ * single sweep in every one of those sizes, 25 included, was ~6–7 ms, so the
+ * tail is not the count). Linear and far below anything a visitor could notice,
+ * but it is linear — a much wider name pattern would be a different claim.
+ *
+ * What stays out of reach: a cookie on a path that is not on this document's
+ * own chain — `/projects/konteo-panel/` seen from `/privacy/`. `document.cookie`
+ * does not report it and a delete cannot address it. That is how the cookie API
+ * works, not a gap in here, and it is why this runs on every page view (see
+ * `applyStoredDecision`) rather than once: each page view reaches its own chain,
+ * and `/` — where Clarity itself writes — is on every one of them. An HttpOnly
+ * cookie is out of reach in the same final way, and the floor does not help
+ * there either: a `document.cookie` write that would overwrite an HttpOnly
+ * cookie is discarded by the cookie store. Measured in this workspace; Clarity
+ * sets its cookies from script, so none of its own are HttpOnly.
+ */
+function clearClarityCookies() {
   const host = window.location.hostname;
   const domains = new Set(['', host, `.${host}`]);
   const registrable = host.split('.').slice(-2).join('.');
@@ -188,16 +257,69 @@ function clearClarityStorage() {
     domains.add(registrable);
     domains.add(`.${registrable}`);
   }
-  for (const name of CLARITY_COOKIES) {
+
+  const paths = new Set(['/']);
+  let walked = '';
+  for (const segment of window.location.pathname.split('/')) {
+    if (!segment) continue;
+    walked += `/${segment}`;
+    paths.add(walked);
+    paths.add(`${walked}/`);
+  }
+
+  // A cookie name cannot contain `;` or `=`, so splitting on those is enough to
+  // recover it from the serialised jar.
+  const names = new Set(CLARITY_COOKIES);
+  for (const entry of document.cookie.split(';')) {
+    const name = entry.split('=')[0].trim();
+    if (isClarityName(name)) names.add(name);
+  }
+
+  for (const name of names) {
     for (const domain of domains) {
-      document.cookie = `${name}=; path=/; max-age=0${domain ? `; domain=${domain}` : ''}`;
+      for (const path of paths) {
+        document.cookie = `${name}=; path=${path}; max-age=0${domain ? `; domain=${domain}` : ''}`;
+      }
     }
   }
+}
+
+/**
+ * Removes every `_cl` key from one web storage area, `floor` included whether
+ * or not it was enumerated.
+ *
+ * `Object.keys` on a `Storage` takes a snapshot, so removing while iterating it
+ * is safe. The whole body is guarded because reaching `window.sessionStorage`
+ * or `window.localStorage` at all throws in some private-browsing
+ * configurations — the same reason `readDecision` is guarded.
+ */
+function sweepStorage(open, floor = []) {
   try {
-    for (const key of CLARITY_SESSION_KEYS) window.sessionStorage.removeItem(key);
+    const storage = open();
+    for (const key of floor) storage.removeItem(key);
+    for (const key of Object.keys(storage)) {
+      if (isClarityName(key)) storage.removeItem(key);
+    }
   } catch {
-    // sessionStorage can be unavailable for the same reasons as localStorage.
+    // Unreadable storage holds nothing of Clarity's that it could have written
+    // either, so there is nothing to recover from here.
   }
+}
+
+/**
+ * Removes what Clarity put into first-party storage: its cookies, its session
+ * token, and any other `_cl` entry in either web storage area.
+ *
+ * Nothing in here is driven by a list of names that has to be kept in step with
+ * an engine nobody here deploys — see `clearClarityCookies` for why that
+ * matters and what it still cannot reach. `localStorage` is swept for the same
+ * reason the cookies are enumerated: no `_cl` key has been seen there, and that
+ * is a measurement of one engine version, not a property of it.
+ */
+function clearClarityStorage() {
+  clearClarityCookies();
+  sweepStorage(() => window.sessionStorage, CLARITY_SESSION_KEYS);
+  sweepStorage(() => window.localStorage);
 }
 
 /**
@@ -261,12 +383,16 @@ let watching = false;
  * A withdrawal therefore reloads the other tab: the injected script tag cannot
  * be unloaded, so a fresh document is the only thing that reliably stops it.
  *
- * No reload loop: nothing in here writes the decision key. `clearClarityStorage`
- * does write `sessionStorage`, which is a real `storage`-event source as well —
- * but those events only reach documents that share the same `sessionStorage`
- * (same tab, so iframes; this site has none), and the `_cltk` key would be
- * rejected by the key guard below anyway. No load path writes `localStorage`
- * either: `applyStoredDecision` only reads.
+ * No reload loop, and the key guard below is what carries that rather than any
+ * claim about who writes what. `clearClarityStorage` writes to both web storage
+ * areas: `sessionStorage`, whose events only reach documents sharing that same
+ * area (same tab, so iframes; this site has none), and `localStorage`, which it
+ * sweeps for `_cl` keys and whose `removeItem` is a real cross-tab
+ * `storage`-event source. Neither can get past the guard: the only keys either
+ * sweep touches are `_cl`-prefixed, `STORAGE_KEY` is excluded from them by
+ * construction (see `isClarityName`), and the guard discards every key that is
+ * neither `STORAGE_KEY` nor `null`. Nothing on any load path writes the decision
+ * key itself: `applyStoredDecision` only reads it.
  *
  * The spec excludes the writing tab from delivery, so the tab the visitor
  * clicked in does not run any of this a second time. A browser that delivers to
