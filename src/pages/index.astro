@@ -13,7 +13,8 @@ const projects = await getCollection('projects', ({ data }) => data.featured);
 // The comparison is deliberately locale-independent: localeCompare() would make
 // the output depend on the runner's ICU version and default locale.
 // Keep this in sync with the identical sort in src/pages/projects/[slug].astro,
-// which drives prev/next.
+// which drives prev/next, and in src/pages/projects/index.astro, which lists
+// every project including the ones the `featured` filter above drops here.
 const featuredProjects = projects
   .sort(
     (a, b) =>
@@ -57,6 +58,24 @@ const featuredProjects = projects
           />
         </div>
       ))}
+    </div>
+
+    {/* The home page's entrance into /projects/; the other inbound link is the
+        "Back to Projects" link in src/pages/projects/[slug].astro, which every
+        detail page carries. Without either of them the overview page would be
+        the orphan this grid's `featured` filter used to create. data-reveal
+        sits on the wrapper, not the <a>: the unlayered reveal rule's
+        `transition` shorthand would otherwise override transition-colors. */}
+    <div data-reveal class="mt-10 sm:mt-12 text-center">
+      <a
+        href="/projects/"
+        class="inline-flex items-center gap-[7px] text-[15px] font-semibold text-orange-700 hover:text-orange-800 transition-colors py-2 min-h-[44px]"
+      >
+        View all projects
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M9 6l6 6-6 6"/>
+        </svg>
+      </a>
     </div>
 
     <!-- contact strip -->

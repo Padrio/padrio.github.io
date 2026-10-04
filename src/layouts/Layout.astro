@@ -1,6 +1,7 @@
 ---
 import Navigation from '../components/Navigation.astro';
 import Footer from '../components/Footer.astro';
+import ConsentBanner from '../components/ConsentBanner.astro';
 import '../styles/global.css';
 
 // Self-hosted fonts (no external requests to Google)
@@ -20,11 +21,13 @@ interface Props {
   lang?: string;
 }
 
-// Default OG image: use profile photo (exists in public/images). Override with image prop or add public/images/og-image.png for a dedicated share image.
+// Default OG image: dedicated 1200x630 share card — the ratio the platforms crop to.
+// PNG rather than WebP because WebP preview support differs across platforms.
+// Override per page with the image prop.
 const {
   title,
   description = 'Solutions Architect & backend engineer — architecture, test harnesses and AI agent teams for systems that have to be provably correct.',
-  image = '/images/profile.jpg',
+  image = '/images/og-image.png',
   lang = 'en',
 } = Astro.props;
 const ogLocales: Record<string, string> = { en: 'en_US', de: 'de_DE' };
@@ -81,11 +84,10 @@ const jsonLd = {
     <!-- JSON-LD Schema -->
     <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
 
-    <!-- Microsoft Clarity (heatmaps & session recordings) -->
-    <script>
-      import Clarity from '@microsoft/clarity';
-      Clarity.init('wu9fh588ka');
-    </script>
+    {/* Nothing may reference Microsoft Clarity from the head: a static import
+        or even a preconnect would be a request before consent. It loads only
+        after an opt-in, through the dynamic import in src/scripts/consent.js
+        that ConsentBanner drives. */}
   </head>
   <body>
     <a href="#main" class="skip-link">Skip to content</a>
@@ -94,6 +96,7 @@ const jsonLd = {
       <slot />
     </main>
     <Footer />
+    <ConsentBanner />
     <script>
       import '../scripts/reveal.js';
     </script>
