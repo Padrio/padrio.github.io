@@ -15,11 +15,24 @@ const DENIED = 'denied';
 const CHANGE_EVENT = 'pk-consent-change';
 
 // A consent is only ever consent to one particular description of the purpose.
-// Bump this whenever what Clarity collects, or where it is transmitted,
-// changes: every record written under an older number stops counting as an
-// answer, so the banner asks again against the new description. It is a plain
-// integer and the only thing that has to be edited for that — the comparison
-// below is an equality check, so there is no ordering to get wrong.
+// That description is not in this file: it is the Microsoft Clarity section of
+// `src/pages/privacy.astro`, and the paragraph there about this entry promises
+// the visitor that the number ties their decision to it. The promise runs both
+// ways, and the board approved it in that form:
+//
+//   - Bump this whenever what Clarity collects, or where it is transmitted,
+//     changes. Every record written under an older number stops counting as an
+//     answer, so the banner asks again against the new description. Leaving the
+//     number alone across such a change puts a commitment in the privacy policy
+//     that this code does not keep.
+//   - Bump it for nothing else. Not for a refactor, not for a fix in here. The
+//     sentence in the policy names collection and transmission as the reason,
+//     so a bump for any other reason makes that sentence inaccurate — and it
+//     throws away every visitor's answer for no change they could notice.
+//
+// It is a plain integer and the only thing that has to be edited for a bump —
+// the comparison below is an equality check, so there is no ordering to get
+// wrong.
 const CONSENT_VERSION = 1;
 // 365 days. A consent that never lapses is not informed consent about the
 // current state of the site, so a record older than this stops counting as an
