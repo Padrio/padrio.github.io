@@ -6,26 +6,28 @@ import '../styles/global.css';
 
 // Self-hosted fonts (no external requests to Google).
 //
-// Nur die latin-Subsets. Die Default-Einstiegspunkte (`inter/400.css`) ziehen alle
-// Subsets des Gewichts in das render-blockierende CSS: 53 @font-face-Regeln, darunter
-// Kyrillisch, Griechisch und Vietnamesisch, die auf dieser Seite (lang="en") kein
-// Zeichen braucht. Drei JetBrains-Mono-Subsets liegen ausserdem unter Vites
-// assetsInlineLimit von 4096 B und landen deshalb als Base64-Data-URI *im* CSS.
+// Latin subsets only. The default entrypoints (`inter/400.css`) pull every subset of
+// a weight into the render-blocking CSS: 53 @font-face rules, among them Cyrillic,
+// Greek and Vietnamese, which this page (lang="en") needs no character from. Six
+// JetBrains Mono faces on top of that — cyrillic-ext and vietnamese in all three
+// imported weights, nine files, because cyrillic-ext is below the limit in woff2 *and*
+// woff — fall under Vite's assetsInlineLimit of 4096 B and therefore end up as base64
+// data URIs *inside* the CSS. No Inter file is below that limit.
 //
-// Der Hebel ist ausschliesslich die CSS-Groesse, nicht die Zahl der Font-Downloads:
-// unicode-range verhindert korrekt, dass ein ungenutztes Subset geholt wird — beide
-// Faelle laden dieselben sieben woff2 —, aber es kann die Bytes eines Data-URI nicht
-// aus dem Stylesheet entfernen. Die reisen unbedingt mit, auch wenn der Browser die
-// Regel anschliessend nie benutzt.
+// The gain is the CSS size alone, not the number of font downloads: unicode-range
+// correctly keeps an unused subset from being fetched — both variants fetch the very
+// same woff2 files per page, four to seven of them depending on the page — but it cannot
+// remove the bytes of a data URI from the stylesheet. Those travel unconditionally, even
+// when the browser never uses the rule.
 //
-// Die latin-*-Einstiegspunkte tragen bewusst *keine* unicode-range (so liefert
-// Fontsource sie aus). Deshalb laesst sich `latin` nicht zusammen mit `latin-ext`
-// importieren: ohne Range wuerde die zweite Deklaration die erste fuer alle Zeichen
-// verdecken. Es ist entweder/oder. Folge fuer den Inhalt: ein Zeichen aus
-// Latin-Extended-A rendert dann per Zeichen-Fallback aus einer System-Schrift statt
-// aus Inter — sichtbar, aber nicht kaputt. Das gebaute HTML enthaelt heute kein
-// solches Zeichen; einziges Zeichen ausserhalb von latin ist der Pfeil U+2192, und
-// der lag in keiner der 53 vorherigen Ranges, fiel also schon vorher zurueck.
+// The latin-* entrypoints deliberately carry *no* unicode-range (that is how Fontsource
+// ships them). `latin` can therefore not be imported next to `latin-ext`: without a
+// range the second declaration would mask the first for every character. It is one or
+// the other. Consequence for content: a Latin Extended-A character then renders through
+// per-character fallback from a system font instead of Inter — visibly different, but
+// not broken. The built HTML contains no such character today; the only character
+// outside latin is the arrow U+2192, and that was in none of the 53 previous ranges, so
+// it already fell back before this change.
 import '@fontsource/inter/latin-400.css';
 import '@fontsource/inter/latin-500.css';
 import '@fontsource/inter/latin-600.css';
