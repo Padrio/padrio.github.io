@@ -43,16 +43,24 @@ const readingTime = Math.max(1, Math.ceil(words / 200));
 // Filter headings for TOC (h2 and h3 only)
 const tocHeadings = headings.filter(h => h.depth === 2 || h.depth === 3);
 
+// Trimmed once so the guard below and the value it emits cannot disagree: a whitespace-only
+// image: is schema-valid and truthy, but new URL() strips the whitespace and would resolve
+// it to the site root.
+const ogImage = project.data.image?.trim();
+
 // SoftwareApplication structured data for richer SEO surface
 const projectJsonLd = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   "name": project.data.title,
   "description": project.data.description,
-  // Resolved the same way as og:image in Layout.astro, so both carry the byte-identical
-  // URL (rule 9). String interpolation would not: new URL() percent-encodes the path.
-  ...(project.data.image && {
-    "image": new URL(project.data.image, Astro.site || 'https://pkrason.de').href,
+  // Resolved the same way as og:image in Layout.astro, so for any non-blank image both
+  // carry the byte-identical URL (rule 9). String interpolation would not: new URL()
+  // percent-encodes the path. Guard and value both read the trimmed value, so a blank
+  // one drops the key here instead of resolving to the site root; Layout falls back to
+  // the default card in that case, and an omitted field has nothing to diverge from.
+  ...(ogImage && {
+    "image": new URL(ogImage, Astro.site || 'https://pkrason.de').href,
   }),
   "url": `https://pkrason.de/projects/${project.id}`,
   "datePublished": project.data.date,
