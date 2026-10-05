@@ -25,8 +25,11 @@
 // the 4.5:1 SC 1.4.3 needs at this size, against orange-700's 5.22:1. Since
 // PRI-137 orange-700 *is* the colour of every text link on the site, this
 // half agrees with the convention now instead of departing from it. Three
-// orange-600 hovers do survive in Hero.astro, but all three are non-text and
-// deliberate — see the comments there.
+// hovers to orange-600 as a text colour do survive in Hero.astro,
+// deliberately, but none of them lands on content text: one `aria-hidden`
+// glyph, rendered text that is pure decoration, and two icon-only links
+// with an `aria-label` and no text node. SC 1.4.3 reaches none of them —
+// see the comments there.
 ---
 
 <div
