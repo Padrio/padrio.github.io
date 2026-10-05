@@ -536,7 +536,7 @@ Der Deploy-Check wandert damit vom Kind zum Epic: ein Kind geht nie einzeln live
 nicht machen.
 
 **Das Gate.** `pr-build` triggert auch für Base `stack/**` — eingeführt mit [PRI-158](/PRI/issues/PRI-158),
-PR [#32](https://github.com/Padrio/padrio.github.io/pull/32), gemergt und seit dem aktiv: `pr-build.yml`
+PR [#32](https://github.com/Padrio/padrio.github.io/pull/32), gemergt und seitdem aktiv: `pr-build.yml`
 listet unter `pull_request.branches` sowohl `main` als auch `'stack/**'`. **Fehlt dieser Eintrag, greift
 der Trigger nicht:** `pr-build.yml` filtert dann nur auf `branches: [ main ]`, und ein Kind-PR gegen
 `stack/**` erzeugt *gar keinen* Check — keinen roten, sondern keinen. Prüfe das am ersten
