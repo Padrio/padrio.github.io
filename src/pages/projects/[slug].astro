@@ -67,10 +67,12 @@ const projectJsonLd = {
   ...(ogImage && {
     "image": new URL(ogImage, siteURL).href,
   }),
-  // Derived from Astro.url.pathname, not re-built from project.id, so this is the same
-  // string canonical and og:url are built from in Layout.astro and cannot drift from them
-  // (rule 9). It also has to carry the trailing slash: build.format defaults to
-  // 'directory', so the page is served at /projects/<id>/ and the slashless form that
+  // Built from the same two inputs as canonical and og:url in Layout.astro
+  // (Astro.url.pathname and Astro.site), so this follows the route instead of
+  // reconstructing it from project.id and can no longer disagree with the route (rule 9).
+  // Those remain two copies of one expression, not one source: an edit to either file can
+  // separate them again. It also has to carry the trailing slash: build.format defaults
+  // to 'directory', so the page is served at /projects/<id>/ and the slashless form that
   // string interpolation produced answered 301 — every SoftwareApplication.url pointed at
   // a redirect while canonical, og:url and the sitemap all used the slash.
   "url": new URL(Astro.url.pathname, siteURL).href,
@@ -78,18 +80,19 @@ const projectJsonLd = {
   "author": {
     "@type": "Person",
     "name": "Pascal Krason",
-    // Left as the literal both Person blocks in Layout.astro emit. siteURL is a URL
+    // Left as the literal the Person block in Layout.astro emits. siteURL is a URL
     // object whose href carries a trailing slash, so deriving it here would make this
-    // field disagree with the Person graph on the same page.
+    // field disagree with that block on the same page.
     "url": "https://pkrason.de"
   },
   "applicationCategory": "BusinessApplication",
-  ...(project.data.tags && { "keywords": project.data.tags.join(", ") }),
-  // installUrl, not sameAs: demo: is where the application itself is reached, and both
-  // Konteo projects carry the same https://konteo.de. As sameAs that asserted two
-  // distinct SoftwareApplication entities were the same thing; installUrl makes no
-  // identity claim, so a shared value is consistent. url stays the detail page.
-  ...(project.data.demo && { "installUrl": project.data.demo })
+  ...(project.data.tags && { "keywords": project.data.tags.join(", ") })
+  // demo: is deliberately not emitted. It was mapped to sameAs, which was wrong: both
+  // Konteo projects carry the same https://konteo.de, so sameAs asserted that two
+  // distinct SoftwareApplication entities were the same thing. No other field fits
+  // either — the value is a product landing page (the UI labels it "Live Demo" below),
+  // not an installUrl or downloadUrl, and url is the detail page. Emitting any of them
+  // would replace a false claim with a weaker one, so the field stays out (rule 13).
 };
 ---
 
