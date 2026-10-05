@@ -152,7 +152,17 @@ export default {
       // set, i.e. it does this plugin's job and a little more. So this is at once the answer to
       // "why does this plugin not handle relative paths" and the cause of the hashed-path
       // branch in the gate.
-      if (typeof src !== 'string' || !src.startsWith('/')) return;
+      //
+      // `startsWith('//')` is the second half of that test and not redundant: a
+      // protocol-relative `//host/x.webp` is remote, but it *starts* with a slash, so the
+      // leading-slash test alone took it for a public/ path. Measured, the visitor then
+      // resolved it to public/host/x.webp, canvasSizeFor threw ENOENT, the glob-loader
+      // swallowed the throw, and the page shipped with an empty body while the gate reported
+      // three missing images — two of them innocent. Fail-closed, but naming the wrong cause,
+      // which is the one failure class this change fights in three other places. Excluding the
+      // shape here is also what makes the gate's ABSOLUTE_URL branch reachable for it rather
+      // than dead code.
+      if (typeof src !== 'string' || !src.startsWith('/') || src.startsWith('//')) return;
 
       // An author-set attribute wins. Both guards below are unreachable from a .md today, and
       // the claim that once stood here — that a raw <img> in a .md is their escape hatch —

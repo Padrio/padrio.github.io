@@ -51,6 +51,10 @@ const IMAGE_INLINE = /!\[[^\]]*\]\(\s*([^)\s]+)/g;
 const IMAGE_REFERENCE = /!\[([^\]]*)\](?:\[([^\]]*)\])?(?!\()/g;
 const LINK_DEFINITION = /^ {0,3}\[([^\]]+)\]:\s*<?([^\s>]+)>?/gm;
 const FRONTMATTER_IMAGE = /^image:\s*(?:"([^"]*)"|'([^']*)'|([^\s"'][^\n]*?))\s*$/m;
+// The floor's input, and the one pattern in this file that deliberately does NOT go through
+// stripCode — see the floor at the bottom. No `g` flag: `.test` on a global regex carries
+// lastIndex between calls and would skip every other file.
+const ROOTED_INLINE_IMAGE = /!\[[^\]]*\]\(\s*\//;
 // A scheme (`https:`, `data:`) or a protocol-relative `//host/…`. Everything else without a
 // leading slash is a path relative to the .md, which is a different case entirely — see
 // `managedImageMatcher`.
@@ -73,8 +77,11 @@ const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 // A co-located image — `![x](./shot.webp)` next to the .md — never reaches the markdown plugin
 // as a public/ path: Astro's own image pipeline takes it over and emits
 // /<build.assets>/<name>.<hash>.<ext> (measured: `./colocated.webp` shipped as
-// /_astro/colocated.y3Qi2GYa_ZLTRK5.webp, with loading="lazy", decoding="async" and both
-// dimensions already set). Matching presence against that shape keeps the empty-page case
+// /_astro/colocated.<hash>.webp, with loading="lazy", decoding="async" and both dimensions
+// already set). The hash is omitted here on purpose: it is a function of the source file, so
+// anyone reproducing this with their own throwaway image gets a different one, and a literal
+// value in this comment would read as a mismatch. Matching presence against that shape keeps
+// the empty-page case
 // caught for such an image, which demanding the literal src cannot: the literal never appears,
 // so the gate used to report `no <img src="./colocated.webp">` for a page that was in fact
 // correct — a permanently red build for the one authoring route that does not need this plugin
@@ -85,7 +92,10 @@ const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 // `assetsPrefix` would move those files onto another origin and break this match. It is not
 // set, and if it ever is, this fails closed.
 function managedImageMatcher(src, assetsDir) {
-  const base = src.split(/[?#]/)[0].split('/').pop() ?? '';
+  // No `?? ''` on the pop: split always yields at least one element, so this is never
+  // undefined. `'a/'.split('/')` gives ['a',''] and pop() gives '', which the dot check below
+  // already rejects.
+  const base = src.split(/[?#]/)[0].split('/').pop();
   const dot = base.lastIndexOf('.');
   if (dot <= 0) return null;
   return new RegExp(`^/${escapeRe(assetsDir)}/${escapeRe(base.slice(0, dot))}`
@@ -177,6 +187,7 @@ export default function assertContentImages() {
         const problems = [];
         let checked = 0;
         let unmeasured = 0;
+        let anyRootedImage = false;
 
         const entries = readdirSync(contentDir).filter((f) => f.endsWith('.md'));
         if (entries.length === 0) {
@@ -186,6 +197,9 @@ export default function assertContentImages() {
         for (const file of entries) {
           const slug = file.replace(/\.md$/, '');
           const md = readFileSync(new URL(file, contentDir), 'utf8');
+          // Read before the early `continue` below, so a file that drops out of the loop still
+          // counts towards the floor.
+          if (ROOTED_INLINE_IMAGE.test(md)) anyRootedImage = true;
           const expected = markdownImageSrcs(md);
           const heroMatch = frontmatter(md).match(FRONTMATTER_IMAGE);
           const hero = heroMatch && (heroMatch[1] ?? heroMatch[2] ?? heroMatch[3]);
@@ -283,8 +297,32 @@ export default function assertContentImages() {
         // this gate asserts is that its expectation list is not empty, and until now it checked
         // that per *file* (`entries.length`) and never per image. Any scanner bug that empties
         // the list therefore reported success — that is the mechanism behind the fail-open hole
-        // the indented-fence case opened, and it is independent of which scanner bug opens it.
-        // Today `checked` is 8, so this is live from the first build rather than theoretical.
+        // the indented-fence case opened. Today `checked` is 8, so this is live from the first
+        // build rather than theoretical.
+        //
+        // The floor is conditioned on `anyRootedImage` and not on `unmeasured === 0`, and that
+        // is the difference between "independent of which scanner bug opens the hole" and a
+        // claim that does not hold. Hung on `unmeasured`, one single unmeasurable image
+        // anywhere in src/content — a co-located one, which the hashed-path branch above just
+        // made a supported authoring route, or a remote one — silenced the floor completely,
+        // even with every /images/… expectation lost. Measured, with the fence bug restored and
+        // one ![](./colocated.webp) added: exit 0, `0 markdown image(s) … ; 1 image(s) present
+        // but not measured`, nine bare <img> tags shipped. `anyRootedImage` asks the other
+        // question instead — would there have been anything to count? — and asks it of the raw
+        // file, so the scanner whose failure the floor exists to catch cannot answer it.
+        //
+        // Two things that follow, both wanted. Removing every image from the markdown leaves
+        // the build legitimately green instead of failing on an empty expectation list. And the
+        // floor covers the inline `![](/…)` form only, which is all eight images in src/content
+        // today and the form the fence bug silenced; a repository whose only root-relative
+        // images were reference-style would have an inert floor. Widening the pattern to link
+        // definitions was rejected on purpose: a definition carries no marker for whether it
+        // feeds an image or a plain link, so a lone root-relative *link* would then arm the
+        // floor on a repository with no markdown images at all.
+        //
+        // One residual false alarm, and it is the same side stripCode already errs on: if the
+        // only root-relative image in the repository sits inside a code block, the floor arms
+        // while the scanner correctly strips it, and the build goes red naming an empty scanner.
         //
         // `problems.length === 0` belongs in the condition and is not decoration. Without it
         // the line also fires on the eviscerated-page case, where every expectation found zero
@@ -293,7 +331,7 @@ export default function assertContentImages() {
         // the previous round removed (measured: 9 problems instead of 8). Conditioned this way
         // the line claims only what it can know, that the build was about to go green without
         // having verified anything.
-        if (checked === 0 && unmeasured === 0 && problems.length === 0) {
+        if (checked === 0 && anyRootedImage && problems.length === 0) {
           problems.push('no markdown image was verified and nothing else failed — the '
             + 'expectation scanner came back empty, which it cannot legitimately do while '
             + 'src/content has images');
