@@ -315,9 +315,12 @@ export default function assertContentImages() {
         // claim that does not hold. Hung on `unmeasured`, one single unmeasurable image
         // anywhere in src/content — a co-located one, which the hashed-path branch above just
         // made a supported authoring route, or a remote one — silenced the floor completely,
-        // even with every /images/… expectation lost. Measured, with the fence bug restored and
-        // one ![](./colocated.webp) added: exit 0, `0 markdown image(s) … ; 1 image(s) present
-        // but not measured`, nine bare <img> tags shipped. `anyRootedImage` asks the other
+        // even with every /images/… expectation lost. Measured, with the fence bug restored in
+        // both image-bearing files, one ![](./colocated.webp) added to one of them and a visitor
+        // that sets nothing: exit 0, `0 markdown image(s) … ; 1 image(s) present but not
+        // measured`, ten bare <img> tags shipped — the same ten the stripCode comment above
+        // counts for this page set, because the co-located image is the one tag that is not bare
+        // (Astro gives it loading, decoding and both dimensions). `anyRootedImage` asks the other
         // question instead — would there have been anything to count? — and asks it of the raw
         // file, so the scanner whose failure the floor exists to catch cannot answer it.
         //
