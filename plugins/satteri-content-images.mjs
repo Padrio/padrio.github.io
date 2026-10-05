@@ -160,8 +160,11 @@ export default {
       // swallowed the throw, and the page shipped with an empty body while the gate reported
       // three missing images — two of them innocent. Fail-closed, but naming the wrong cause,
       // which is the one failure class this change fights in three other places. Excluding the
-      // shape here is also what makes the gate's ABSOLUTE_URL branch reachable for it rather
-      // than dead code.
+      // shape here is also what makes the gate's ABSOLUTE_URL branch reachable *for that case*
+      // — a `//host/…` whose file is missing, where the render used to die first and the gate
+      // never got that far. Not for the shape as such: with the file present, the gate has
+      // always classified `//images/…` as remote-unmeasurable through that branch, which is
+      // exactly the disagreement the next paragraph is about.
       //
       // The one thing the guard takes away, named rather than glossed: `//images/x.webp` with
       // the file actually present in public/ used to get the attributes, because canvasSizeFor

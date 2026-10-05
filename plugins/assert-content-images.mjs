@@ -51,10 +51,20 @@ const IMAGE_INLINE = /!\[[^\]]*\]\(\s*([^)\s]+)/g;
 const IMAGE_REFERENCE = /!\[([^\]]*)\](?:\[([^\]]*)\])?(?!\()/g;
 const LINK_DEFINITION = /^ {0,3}\[([^\]]+)\]:\s*<?([^\s>]+)>?/gm;
 const FRONTMATTER_IMAGE = /^image:\s*(?:"([^"]*)"|'([^']*)'|([^\s"'][^\n]*?))\s*$/m;
-// The floor's input, and the one pattern in this file that deliberately does NOT go through
-// stripCode — see the floor at the bottom. No `g` flag: `.test` on a global regex carries
-// lastIndex between calls and would skip every other file.
-const ROOTED_INLINE_IMAGE = /!\[[^\]]*\]\(\s*\//;
+// The floor's input, and the one markdown-body pattern in this file that deliberately does NOT
+// go through stripCode — see the floor at the bottom. (FRONTMATTER_IMAGE skips stripCode as
+// well, but it is applied to the frontmatter block rather than to the body.) No `g` flag:
+// `.test` on a global regex carries lastIndex between calls and would skip every other file.
+//
+// The `(?!\/)` mirrors the visitor's `startsWith('//')` guard and the `\/\/` alternative in
+// ABSOLUTE_URL below. A protocol-relative `![x](//host/x.webp)` *begins* with a slash but is
+// remote, and the gate therefore counts it as unmeasured rather than checking it — so arming
+// the floor on it made a correct build red and named the one component that was not broken.
+// Measured at the head before this line: all eight inline images removed and a single
+// `![remote](//cdn.example.com/x.webp)` left behind gives `checked === 0`, `unmeasured === 1`,
+// an empty problem list and exit 1 on "the expectation scanner came back empty" — which the
+// scanner was right about. It is the same confusion the visitor's guard removes, one file over.
+const ROOTED_INLINE_IMAGE = /!\[[^\]]*\]\(\s*\/(?!\/)/;
 // A scheme (`https:`, `data:`) or a protocol-relative `//host/…`. Everything else without a
 // leading slash is a path relative to the .md, which is a different case entirely — see
 // `managedImageMatcher`.
@@ -81,13 +91,13 @@ const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 // already set). The hash is omitted here on purpose: it is a function of the source file, so
 // anyone reproducing this with their own throwaway image gets a different one, and a literal
 // value in this comment would read as a mismatch. Matching presence against that shape keeps
-// the empty-page case
-// caught for such an image, which demanding the literal src cannot: the literal never appears,
-// so the gate used to report `no <img src="./colocated.webp">` for a page that was in fact
-// correct — a permanently red build for the one authoring route that does not need this plugin
-// at all. The attributes are deliberately not asserted on it: they are Astro's defaults, not
-// this plugin's output, and a gate here would make the build red for something the pipeline
-// cannot put right — the same reasoning as for a raw <img> in the header above.
+// the empty-page case caught for such an image, which demanding the literal src cannot: the
+// literal never appears, so the gate used to report `no <img src="./colocated.webp">` for a
+// page that was in fact correct — a permanently red build for the one authoring route that
+// does not need this plugin at all. The attributes are deliberately not asserted on it: they
+// are Astro's defaults, not this plugin's output, and a gate here would make the build red for
+// something the pipeline cannot put right — the same reasoning as for a raw <img> in the
+// header above.
 //
 // `assetsPrefix` would move those files onto another origin and break this match. It is not
 // set, and if it ever is, this fails closed.
