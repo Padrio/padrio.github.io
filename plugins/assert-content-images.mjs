@@ -285,9 +285,18 @@ export default function assertContentImages() {
         // the list therefore reported success — that is the mechanism behind the fail-open hole
         // the indented-fence case opened, and it is independent of which scanner bug opens it.
         // Today `checked` is 8, so this is live from the first build rather than theoretical.
-        if (checked === 0 && unmeasured === 0) {
-          problems.push('no markdown image was checked at all — the expectation scanner '
-            + 'returned nothing, which it cannot legitimately do while src/content has images');
+        //
+        // `problems.length === 0` belongs in the condition and is not decoration. Without it
+        // the line also fires on the eviscerated-page case, where every expectation found zero
+        // tags and moved on: the output is then eight accurate problems plus a ninth blaming
+        // the scanner, which had done its job — the same misleading-cause failure as the two
+        // the previous round removed (measured: 9 problems instead of 8). Conditioned this way
+        // the line claims only what it can know, that the build was about to go green without
+        // having verified anything.
+        if (checked === 0 && unmeasured === 0 && problems.length === 0) {
+          problems.push('no markdown image was verified and nothing else failed — the '
+            + 'expectation scanner came back empty, which it cannot legitimately do while '
+            + 'src/content has images');
         }
 
         if (problems.length > 0) {
