@@ -428,8 +428,8 @@ deswegen nicht nach Regel 12 auf `blocked`.
 **Ein Head-Branch hat nie gleichzeitig einen offenen PR gegen `main` und einen gegen `stack/**`.**
 Entscheide dich für eine Base; brauchst du die andere, schließe den ersten PR, bevor du den zweiten
 öffnest. Der Grund: Check-Runs hängen bei `pull_request` am **Head-SHA**, und GitHub erlaubt zwei offene
-PRs von demselben Head, solange die Bases verschieden sind. Ab dem Merge von PR
-[#32](https://github.com/Padrio/padrio.github.io/pull/32) erzeugen dann **beide** PRs einen Check-Run unter
+PRs von demselben Head, solange die Bases verschieden sind. Seit dem Merge von PR
+[#32](https://github.com/Padrio/padrio.github.io/pull/32) erzeugen **beide** PRs einen Check-Run unter
 demselben Namen `pr-build` auf demselben Commit; die Concurrency-Group enthält `github.ref`
 (`refs/pull/N/merge`) und ist pro PR eindeutig, die Läufe räumen sich also nicht gegenseitig ab — die
 Reihenfolge ist ein Rennen. Ein grüner Lauf, der gegen den **Stack**-Base gebaut hat, kann so den
@@ -535,10 +535,11 @@ entscheidungsabhängig (braucht einen Fakt oder eine Abwägung von außen — Bo
 Der Deploy-Check wandert damit vom Kind zum Epic: ein Kind geht nie einzeln live, also kann es ihn auch
 nicht machen.
 
-**Das Gate.** `pr-build` triggert auch für Base `stack/**` — eingeführt mit
-[PRI-158](/PRI/issues/PRI-158), PR [#32](https://github.com/Padrio/padrio.github.io/pull/32). **Bis #32
-gemergt ist, greift der Trigger nicht:** `pr-build.yml` filtert dann weiter auf `branches: [ main ]`, und
-ein Kind-PR gegen `stack/**` erzeugt *gar keinen* Check — keinen roten, sondern keinen. Prüfe das am ersten
+**Das Gate.** `pr-build` triggert auch für Base `stack/**` — eingeführt mit [PRI-158](/PRI/issues/PRI-158),
+PR [#32](https://github.com/Padrio/padrio.github.io/pull/32), gemergt und seit dem aktiv: `pr-build.yml`
+listet unter `pull_request.branches` sowohl `main` als auch `'stack/**'`. **Fehlt dieser Eintrag, greift
+der Trigger nicht:** `pr-build.yml` filtert dann nur auf `branches: [ main ]`, und ein Kind-PR gegen
+`stack/**` erzeugt *gar keinen* Check — keinen roten, sondern keinen. Prüfe das am ersten
 Kind-PR eines neuen Stacks, bevor du dich auf das Gate verlässt. „Kein Check" liest man **über die API,
 nicht in der PR-Ansicht**: `pull-request-read` mit `method: get_check_runs`; vorhanden ist der Check, wenn
 `total_count ≥ 1` ist **und** ein Eintrag `name: "pr-build"` trägt. Ein fehlender Check sieht im UI nicht
