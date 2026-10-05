@@ -62,6 +62,12 @@ const aiSecondary = ['Paperclip', 'MCP', 'vLLM', 'Ollama', 'Hugging Face', 'RAG'
       <span class="font-mono text-xs text-stone-700 tracking-[0.01em]">
         Available for projects<span class="hidden sm:inline"> &amp; freelance work</span>
       </span>
+      {/* orange-600 on purpose, and the last place on the site that still
+          hovers to it: PRI-137 moved every text link to orange-700 because
+          orange-600 is about 3.6:1 on white and fails SC 1.4.3's 4.5:1. This
+          glyph is rendered text but `aria-hidden`, so it is pure decoration —
+          1.4.3 does not reach it, 1.4.11's 3:1 does, and 3.6:1 clears that.
+          Darkening it would only weaken the hover step for no gain. */}
       <span
         aria-hidden="true"
         class="text-stone-500 group-hover:text-orange-600 group-focus-visible:text-orange-600 group-hover:translate-x-0.5 group-focus-visible:translate-x-0.5 transition-[color,transform,translate]"
@@ -70,6 +76,11 @@ const aiSecondary = ['Paperclip', 'MCP', 'vLLM', 'Ollama', 'Hugging Face', 'RAG'
   </div>
 
   <!-- socials -->
+  {/* Both links keep orange-600 on hover while every text link moved to
+      orange-700 with PRI-137: they carry an `aria-label` and an icon, no text
+      node, so the threshold is 1.4.11's 3:1 rather than 1.4.3's 4.5:1 and
+      orange-600's ~3.6:1 on white clears it. Left as is so the hover step away
+      from stone-900 keeps the contrast it has. */}
   <div data-reveal class="flex gap-3 mt-6">
     <a
       href="https://github.com/Padrio"
@@ -139,7 +150,7 @@ const aiSecondary = ['Paperclip', 'MCP', 'vLLM', 'Ollama', 'Hugging Face', 'RAG'
 
   <!-- about -->
   <p data-reveal class="text-[22px] sm:text-[23px] leading-[1.45] font-semibold text-stone-900 max-w-[600px] mt-12 sm:mt-16 tracking-[-0.015em] text-pretty">
-    Anyone can ship the feature. The hard part is proving it still obeys the rules next year. <span class="text-orange-600">That's the part I build.</span>
+    Anyone can ship the feature. The hard part is proving it still obeys the rules next year. <span class="text-orange-700">That's the part I build.</span>
   </p>
   <p data-reveal class="text-[17px] leading-[1.72] text-stone-600 max-w-[580px] mt-[22px] text-pretty">
     <strong class="text-stone-800 font-semibold">10+ years</strong> as a backend engineer and solutions architect. I build the scaffolding a domain needs before the first feature exists: the architecture, the test harness that encodes its rules, and the AI agent teams that ship against it. When billing is dictated by statute, the statute belongs in the test suite — not buried in a service class. Currently driving API modernization and AI-assisted workflows at Stoll von Gáti; alongside client work I run my own product portfolio: multi-tenant SaaS, IoT backends with OTA firmware rollouts, and billing software for legally defined processes.
