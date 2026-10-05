@@ -8,10 +8,23 @@ import { closeSync, openSync, readSync } from 'node:fs';
 // fold). The two reasons that do hold:
 //
 //   loading="lazy"  Payload and LCP. /projects/konteo-panel/ fetched all seven of its images
-//                   eagerly. Measured against the build on the stack tip, 390 px viewport,
-//                   400 kbit/s, cold cache, no scroll: 7 requests / 921,4 KiB become 1
-//                   request / 122,9 KiB — only the above-the-fold hero — and LCP drops from
-//                   19,1 s to 7,66 s (-60 %, three runs each, spread under 70 ms).
+//                   eagerly. The claim that holds in every configuration measured — five
+//                   viewports unthrottled, four emulated latencies and a 400 kbit/s series,
+//                   on both detail pages — is the weak one: requests and bytes at first paint
+//                   are never higher than before, and strictly lower everywhere except on
+//                   /projects/konteo-provision/ from 390 px up over a fast line. "lazy always
+//                   saves something" would be false.
+//                   Exact counts hold only per configuration, because Chromium's distance
+//                   threshold for lazy loading depends on its network estimate, which depends
+//                   on the emulated latency — so every figure here names its setup. At 390 px,
+//                   400 kbit/s, 50 ms latency, cold cache, no scroll: 7 requests / 921,4 KiB
+//                   become 1 request / 122,9 KiB, only the above-the-fold hero. At the same
+//                   bandwidth with latency 0 the same build fetches 3 / 382,7 KiB — a property
+//                   of the emulated connection, not of this diff. LCP at 390 px / 400 kbit/s
+//                   falls from 19,1 s to 7,66 s (-60 %) at 50 ms and to 9,2 s (-51,8 %) at
+//                   latency 0, three runs each, spread under 90 ms; the LCP element is the
+//                   hero IMG in both variants. Whoever re-measures: state your latency, or
+//                   your deviation reads as a regression. It did to the QA auditor, and to me.
 //   width/height    A not-yet-loaded image has no height of its own: with the response held
 //                   back it measures 28,9-86,6 px (its alt-text box, depending on viewport)
 //                   where the loaded image is 200-522 px tall. lazy is exactly what keeps
@@ -21,8 +34,13 @@ import { closeSync, openSync, readSync } from 'node:fs';
 //                   whose width comes from scroll progress. Measured on the same page: with
 //                   the attributes, scrollHeight is already its settled 9328 px at first
 //                   paint with none of the six images loaded; with lazy but no dimensions it
-//                   starts at 7772 px and has to grow by 1556 px (16,7 %) as they arrive. So
-//                   lazy without dimensions is the worse variant, not the smaller one.
+//                   starts at 7772 px and has to grow by 1556 px — 20,0 % of where it starts,
+//                   16,7 % of where it ends — as they arrive. So lazy without dimensions is
+//                   the worse variant, not the smaller one. Confirmed on a second path by
+//                   blocking the image responses instead of stripping the attributes: 8090 ->
+//                   9328 px at 390 px, the same settled number, and with the attributes the
+//                   first-paint scrollHeight already equals the settled one at all five
+//                   viewports on both pages.
 //
 // The attributes barely touch the layout of a *loaded* image, because Tailwind's preflight
 // already sets `img,video{max-width:100%;height:auto}` and the height keeps following the
@@ -32,7 +50,8 @@ import { closeSync, openSync, readSync } from 'node:fs';
 // the bit, and the rendered *width* grows by exactly one Chromium LayoutUnit (1/64 px =
 // 0,015625) at every one of the five. The direction is the right way round — with the
 // attributes the image fills its column exactly (288/358/644/712/720 px), without them it
-// fell one LayoutUnit short.
+// fell one LayoutUnit short. It has no observable consequence in the raster either: clipped
+// screenshots of the loaded image are byte-identical between the two variants.
 //
 // The hero image of a detail page is out of reach here by construction: it comes from the
 // frontmatter and is rendered by src/pages/projects/[slug].astro, not by the markdown
@@ -50,6 +69,13 @@ const PUBLIC_DIR = new URL('../public/', import.meta.url);
 // is worse than a build that stops: a wrong ratio is a real layout bug and no gate in this
 // repository would see it, whereas the throw below names the file and the chunk it found.
 // Re-encode to VP8X or teach this function that chunk, deliberately.
+//
+// That stop is reachable rather than theoretical, and the next author should expect it:
+// sharp — the tool CLAUDE.md's rule 6 points at — writes VP8X only when the source carries
+// metadata. From a metadata-free source `{quality:80}` yields `VP8 ` and `{lossless:true}`
+// yields `VP8L` (measured by the code auditor on konteo-login.webp). A re-encode done the
+// documented way can therefore land here; teaching this function those two layouts is then
+// the fix, not working around the throw.
 export function webpCanvasSize(path) {
   const header = Buffer.alloc(30);
   const fd = openSync(path, 'r');
@@ -82,17 +108,23 @@ export function webpCanvasSize(path) {
   };
 }
 
-// One read per distinct src for the whole build, not per page render.
+// One read per distinct file for the whole build, not per page render. Never invalidated,
+// which is right for a build (one process, one pass) but not for `astro dev`: a long-lived
+// dev server keeps the dimensions of a file that has since been replaced until it restarts.
+// Not a shipping risk — the gate reads the real files on every build.
 const sizeCache = new Map();
 
-function canvasSizeFor(src) {
-  if (!sizeCache.has(src)) {
-    // src is site-root-relative, so it maps onto public/ one-to-one. The leading slash has
-    // to go, or the URL constructor would resolve it against the filesystem root instead of
-    // against PUBLIC_DIR.
-    sizeCache.set(src, webpCanvasSize(new URL(src.replace(/^\/+/, ''), PUBLIC_DIR)));
-  }
-  return sizeCache.get(src);
+// Resolution lives here and only here, so the gate cannot compute it a second, slightly
+// different way (CLAUDE.md, rule 9 in the small). PUBLIC_DIR is only a default: the gate
+// passes Astro's resolved `config.publicDir`, which is what actually governs the build.
+export function canvasSizeFor(src, publicDir = PUBLIC_DIR) {
+  // src is site-root-relative, so it maps onto public/ one-to-one. The leading slash has to
+  // go, or the URL constructor would resolve it against the filesystem root instead of
+  // against publicDir. The cache is keyed on the resolved path, not on src, so two different
+  // publicDirs cannot collide on one entry.
+  const path = new URL(src.replace(/^\/+/, ''), publicDir);
+  if (!sizeCache.has(path.href)) sizeCache.set(path.href, webpCanvasSize(path));
+  return sizeCache.get(path.href);
 }
 
 export default {
@@ -108,12 +140,22 @@ export default {
       // keeps one from slipping through half-done.
       if (typeof src !== 'string' || !src.startsWith('/')) return;
 
-      // An author-set attribute wins. Markdown has no syntax for these, so this only
-      // matters for a raw <img> in a .md file: the escape hatch for a case this plugin
-      // would get wrong.
+      // An author-set attribute wins. Both guards below are unreachable from a .md today, and
+      // the claim that once stood here — that a raw <img> in a .md is their escape hatch —
+      // was wrong: measured, raw HTML in a .md never reaches this visitor at all. Such a tag
+      // ships verbatim, without loading and without dimensions, and the gate does not see it
+      // either; that is the one fail-open gap in this change, and it is written up in the
+      // gate's own header. Markdown's ![](...) syntax cannot carry these attributes, so from
+      // markdown the guards always pass. What they do guard against is another hast plugin,
+      // or a future non-markdown source, having set them before this one runs.
       if (node.properties.loading === undefined) {
         ctx.setProperty(node, 'loading', 'lazy');
       }
+      // Both-or-neither, deliberately: one dimension alone gives the UA no aspect ratio, so
+      // completing the missing half would be a guess about intent. The consequence is that a
+      // node arriving with exactly one of them set gets lazy without a reserved box — the
+      // combination this header calls the worse variant. Unreachable from markdown for the
+      // reason above; if some source ever reaches it, fix it there rather than guessing here.
       if (node.properties.width === undefined && node.properties.height === undefined) {
         const { width, height } = canvasSizeFor(src);
         ctx.setProperty(node, 'width', width);

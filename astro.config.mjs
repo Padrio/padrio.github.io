@@ -2,13 +2,21 @@ import { defineConfig } from 'astro/config';
 import tailwindcss from '@tailwindcss/vite';
 import icon from 'astro-icon';
 import sitemap from '@astrojs/sitemap';
-// Sätteri is Astro 7's default Markdown processor, and `satteri()` is the only way to reach
-// its plugin pipeline — `markdown.rehypePlugins` is the legacy unified path and refuses to
-// build without @astrojs/markdown-remark, which rule 8 would make a board question. This
-// import is not a new dependency: @astrojs/markdown-satteri is a plain (not optional)
-// dependency of astro, pinned at an exact version in package-lock.json, so npm ci always
-// puts it in node_modules. It is deliberately not added to package.json — same footing as
-// sharp in CLAUDE.md, rule 6: present and usable, not declared.
+// Sätteri is Astro 7's default Markdown processor, and `satteri()` is the documented way to
+// reach its plugin pipeline. `markdown.rehypePlugins` is not an alternative to it: that is
+// the legacy unified path and refuses to build without @astrojs/markdown-remark, which rule 8
+// would make a board question. This import is not a new dependency either —
+// @astrojs/markdown-satteri is a plain (not optional) dependency of astro, pinned at an exact
+// version in package-lock.json, so npm ci always puts it in node_modules. It is deliberately
+// not added to package.json: same footing as sharp in CLAUDE.md, rule 6 — present and usable,
+// not declared.
+//
+// "Documented way", not "only way". An integration can also push into the hastPlugins array
+// the default processor already holds, from astro:config:done, with no import at all — the
+// code auditor measured that route and got a byte-identical dist. It is not used here because
+// it mutates already-validated config state and no-ops silently if anyone sets a different
+// processor, both of which this explicit form avoids. It stays on record as the fallback,
+// should the board ever object to the undeclared import.
 import { satteri } from '@astrojs/markdown-satteri';
 import contentImages from './plugins/satteri-content-images.mjs';
 import assertContentImages from './plugins/assert-content-images.mjs';
