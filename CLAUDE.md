@@ -23,7 +23,7 @@ Diese Datei wird automatisch gelesen und ist die maßgebliche Quelle für Projek
 | Icons | `astro-icon` 1.2 mit `@iconify-json/simple-icons` |
 | SEO | `@astrojs/sitemap` |
 | Fonts | `@fontsource/inter` und `@fontsource/jetbrains-mono` — selbst gehostet, keine externen Requests |
-| Analytics | Microsoft Clarity (`@microsoft/clarity`), Projekt-ID (`CLARITY_PROJECT_ID`) und `Clarity.init` in `src/scripts/consent.js` — seit [PRI-123](/PRI/issues/PRI-123) hinter dem Consent-Gate, geladen erst nach dem Opt-in. In `src/layouts/Layout.astro` steht dazu nichts. |
+| Analytics | Microsoft Clarity (`@microsoft/clarity`), Projekt-ID (`CLARITY_PROJECT_ID`) und `Clarity.init` in `src/scripts/consent.js` — seit [PRI-123](/PRI/issues/PRI-123) hinter dem Consent-Gate, geladen erst nach dem Opt-in. In `src/layouts/Layout.astro` steht dazu nur ein Kommentar, der festhält, warum dort kein Clarity-Code stehen darf. |
 
 ### Befehle
 
@@ -65,9 +65,11 @@ src/content.config.ts         Schema der Content Collection "projects" (Zod, Con
 src/content/projects/*.md     Ein Markdown-File pro Projekt, Frontmatter nach obigem Schema
 src/layouts/Layout.astro      HTML-Grundgerüst: Meta-/OG-/Twitter-Tags, Person-JSON-LD,
                               Fonts, Skip-Link, Navigation, Footer, <ConsentBanner />, reveal.js.
-                              Im <head> steht bewusst nichts zu Clarity — ein statischer Import
-                              oder ein Preconnect dort wäre ein Kontakt vor der Einwilligung;
-                              Projekt-ID und Init liegen in src/scripts/consent.js
+                              Im Markup steht bewusst kein Clarity-Code: ein statischer Import
+                              oder ein Preconnect, der schon beim Parsen des <head> feuert, wäre
+                              ein Kontakt vor der Einwilligung. Im <head> steht dazu nur ein
+                              {/* … */}-Kommentar, der genau das festhält; Projekt-ID und Init
+                              liegen in src/scripts/consent.js
 src/pages/index.astro         Startseite: Hero, CareerTimeline, "Selected Works", Kontakt-Strip
 src/pages/projects/[slug].astro  Projekt-Detailseite: getStaticPaths über die Collection,
                               Prev/Next, Lesezeit, Scroll-Spy-TOC, SoftwareApplication-JSON-LD
@@ -76,8 +78,11 @@ src/pages/privacy.astro       Datenschutzerklärung
 src/components/               Hero, CareerTimeline, ExperienceCard, ProjectCard, Navigation, Footer,
                               ConsentBanner
 src/scripts/consent.js        Consent-Gate für Clarity: Projekt-ID, Clarity.init und der dynamische
-                              Import, der vor dem Opt-in nicht ausgeführt wird. Von ConsentBanner
-                              angesteuert; `@microsoft/clarity` wird nur hier importiert
+                              Import, der vor dem Opt-in nicht ausgeführt wird. Importiert von
+                              ConsentBanner und von src/pages/privacy.astro (dort hängen der
+                              Widerrufs-Button und die Status-Zeile daran) — beide Pfade gehören
+                              zum Blast Radius jeder Änderung hier (Regel 9);
+                              `@microsoft/clarity` wird nur hier importiert
 src/scripts/reveal.js         Staggered Scroll-Reveal (respektiert prefers-reduced-motion)
 src/styles/global.css         Tailwind-Layer, Basis-Styles, Skip-Link, Reveal-Styles
 ```
