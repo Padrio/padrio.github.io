@@ -43,6 +43,11 @@ const readingTime = Math.max(1, Math.ceil(words / 200));
 // Filter headings for TOC (h2 and h3 only)
 const tocHeadings = headings.filter(h => h.depth === 2 || h.depth === 3);
 
+// One fallback host for the whole file, so no two fields in the same JSON-LD object can
+// disagree about where the site lives. Same expression Layout.astro resolves canonical,
+// og:url and og:image against.
+const siteURL = Astro.site || 'https://pkrason.de';
+
 // Trimmed once so the guard below and the value it emits cannot disagree: a whitespace-only
 // image: is schema-valid and truthy, but new URL() strips the whitespace and would resolve
 // it to the site root.
@@ -60,18 +65,31 @@ const projectJsonLd = {
   // one drops the key here instead of resolving to the site root; Layout falls back to
   // the default card in that case, and an omitted field has nothing to diverge from.
   ...(ogImage && {
-    "image": new URL(ogImage, Astro.site || 'https://pkrason.de').href,
+    "image": new URL(ogImage, siteURL).href,
   }),
-  "url": `https://pkrason.de/projects/${project.id}`,
+  // Derived from Astro.url.pathname, not re-built from project.id, so this is the same
+  // string canonical and og:url are built from in Layout.astro and cannot drift from them
+  // (rule 9). It also has to carry the trailing slash: build.format defaults to
+  // 'directory', so the page is served at /projects/<id>/ and the slashless form that
+  // string interpolation produced answered 301 — every SoftwareApplication.url pointed at
+  // a redirect while canonical, og:url and the sitemap all used the slash.
+  "url": new URL(Astro.url.pathname, siteURL).href,
   "datePublished": project.data.date,
   "author": {
     "@type": "Person",
     "name": "Pascal Krason",
+    // Left as the literal both Person blocks in Layout.astro emit. siteURL is a URL
+    // object whose href carries a trailing slash, so deriving it here would make this
+    // field disagree with the Person graph on the same page.
     "url": "https://pkrason.de"
   },
   "applicationCategory": "BusinessApplication",
   ...(project.data.tags && { "keywords": project.data.tags.join(", ") }),
-  ...(project.data.demo && { "sameAs": [project.data.demo] })
+  // installUrl, not sameAs: demo: is where the application itself is reached, and both
+  // Konteo projects carry the same https://konteo.de. As sameAs that asserted two
+  // distinct SoftwareApplication entities were the same thing; installUrl makes no
+  // identity claim, so a shared value is consistent. url stays the detail page.
+  ...(project.data.demo && { "installUrl": project.data.demo })
 };
 ---
 
