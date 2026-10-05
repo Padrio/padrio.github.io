@@ -13,14 +13,18 @@
 // unaffected. The price is that it covers the bottom of the document, which
 // the script below pays for with reserved space — see there.
 //
-// `border-stone-500` on Decline and `text-orange-700` on the link deviate from
-// the site's usual stone-300/orange-600 on purpose: both of those miss their
-// WCAG contrast minimum here (1.49:1 and 3.58:1 measured against the Tailwind 4
-// oklch palette), and a refusal with no perceivable boundary is not an equal
-// choice next to a filled button. The replacements were measured too, not
-// guessed: stone-500 border 4.79:1 against white (SC 1.4.11 needs 3:1) and
-// orange-700 text 5.22:1 (SC 1.4.3 needs 4.5:1 at this size). Putting either
-// back "on convention" reintroduces a failure.
+// `border-stone-500` on Decline deviates from the site's usual stone-300 on
+// purpose: stone-300 misses its WCAG contrast minimum here (1.49:1 measured
+// against the Tailwind 4 oklch palette), and a refusal with no perceivable
+// boundary is not an equal choice next to a filled button. The replacement was
+// measured too, not guessed: stone-500 border 4.79:1 against white (SC 1.4.11
+// needs 3:1). Putting it back "on convention" reintroduces a failure.
+//
+// `text-orange-700` on the link was the second half of that deviation — the
+// site's link colour was orange-600, which is 3.58:1 against white and under
+// the 4.5:1 SC 1.4.3 needs at this size, against orange-700's 5.22:1. Since
+// PRI-137 orange-700 *is* the site-wide link colour, so this half agrees with
+// the convention now instead of departing from it.
 ---
 
 <div
