@@ -536,8 +536,8 @@ wie ein Fehler aus — genau diese Fehlerklasse ist hier gemeint. Läuft an eine
 weiterarbeiten.
 
 **Ein *rotes* `pr-build` hält genauso auf wie ein fehlendes.** Beides heißt, dass Regel 3 an diesem Kind
-nicht automatisch nachgewiesen ist; also wird auch dann nicht in den Stack gemergt. Der Unterschied liegt nur im Auffallen:
-rot siehst du in der PR-Ansicht, fehlend nicht — deshalb steht oben der API-Weg.
+nicht automatisch nachgewiesen ist; also wird auch dann nicht in den Stack gemergt. Der Unterschied liegt
+nur im Auffallen: rot siehst du in der PR-Ansicht, fehlend nicht — deshalb steht oben der API-Weg.
 
 **An einem Kind-PR gegen einen Stack-Branch erzwingt kein Check etwas.** Dort ist `pr-build`
 **nicht erforderlich**, sondern nur informativ: das Ruleset `main: pr-build required` ist auf `~DEFAULT_BRANCH`
@@ -547,9 +547,9 @@ Geltungsbereich hineinbenennen (gemessen am 2026-10-02, nur gelesen: genau **ein
 `conditions.ref_name.include: ["~DEFAULT_BRANCH"]`, `bypass_actors: []` — Details in
 **Runtime-Realität**, „`main` ist per Ruleset geschützt"). Ein rotes oder fehlendes `pr-build` macht einen
 Kind-PR gegen einen Stack-Branch also nicht unmergebar — das ist aus dem Ruleset-Befund hergeleitet, am
-Kind-PR selbst haben wir es nicht gemessen. Was dort weiter blockt, sind Merge-Konflikte; der Check tut es
-nicht. Die Disziplin des Implementers, der den roten oder fehlenden Haken sieht, ist dort das ganze
-Check-Gate.
+Kind-PR selbst haben wir es nicht gemessen. Was dort weiter blockt, sind etwa Merge-Konflikte; der Check
+tut es nicht. Die Disziplin des Implementers, der den roten oder fehlenden Haken sieht, ist dort das ganze
+Gate: an einem Kind-PR gegen einen Stack-Branch ist *Das Gate* eine Verhaltensregel, keine Mechanik.
 
 **Das ist keine zu schließende Lücke.** Board-Entscheidung vom 2026-10-03, Variante **C**
 ([PRI-165](/PRI/issues/PRI-165)): nur Dokumentation, **kein** Ruleset auf `stack/**`. Der harte, erzwungene
