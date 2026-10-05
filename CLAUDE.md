@@ -467,8 +467,22 @@ Stack-Historie umschreiben.
 2. jedes **offene** Kind mergt danach den neuen Stack-Tip ein; geschlossene Kinder werden nicht angefasst;
 3. niemals rebasen.
 
-Der Zweck des Nachziehens ist hier allein die Konfliktfreiheit beim späteren `--no-ff` — **nicht** ein
-Merge-Blocker. Das Ruleset `main: pr-build required` mit `strict_required_status_checks_policy: true` gilt
+**Derselbe Nachziehschritt gilt nach *jedem* Merge in den Stack, nicht nur bei `main`-Drift.** Mergt ein
+**Geschwisterkind** in den Stack-Branch, während `main` stillsteht, braucht jedes andere offene Kind
+genauso Schritt 2: den neuen Stack-Tip einmergen, nicht rebasen. Dieser Auslöser hängt nicht an `main`:
+jeder Merge eines Geschwisterkindes löst ihn für jedes übrige offene Kind aus.
+
+Der Grund gehört mitgeschrieben, sonst sieht der Schritt nach Buchhaltung aus: `pull_request` feuert
+`synchronize` nur, wenn sich der **Head** eines PR bewegt, nicht wenn seine **Base** weiterläuft (so
+beschreibt GitHub den Event — **das ist dokumentiert, nicht von uns gemessen**). Ein anderes offenes Kind
+behält damit sein grünes `pr-build`, das gegen den **alten** Stack-Tip gebaut hat; die Kombination, die beim
+Merge tatsächlich entsteht, hat nie gebaut. Erzwungen ist das Nachziehen hier nicht — siehe den nächsten
+Absatz und *Das Gate* unten (Board-Entscheidung vom 2026-10-03, Variante **C**,
+[PRI-165](/PRI/issues/PRI-165): nur Dokumentation, kein Ruleset auf `stack/**`).
+
+Das Nachziehen hat hier damit **zwei** Zwecke, und keiner von beiden ist ein Merge-Blocker: die
+Konfliktfreiheit beim späteren `--no-ff`, und dass das grüne `pr-build` die Kombination gebaut hat, die beim
+Merge wirklich entsteht. Das Ruleset `main: pr-build required` mit `strict_required_status_checks_policy: true` gilt
 für `~DEFAULT_BRANCH` (**Runtime-Realität**, „`main` ist per Ruleset geschützt"); ein Kind-PR mit Base
 `stack/**` wird also nie als `mergeable_state: "behind"` blockiert. Such an einem Kind-PR nicht nach einem
 Blocker, den es dort nicht gibt — das ist der Unterschied zu **Arbeitsablauf**, Schritt 5, der genau diesen
@@ -532,6 +546,31 @@ wie ein Fehler aus — genau diese Fehlerklasse ist hier gemeint. Läuft an eine
 **kein** Check, wird nicht gemergt: dann fehlen beide automatischen Qualitätsgates des Projekts (Regel 3 —
 `npm run build` und das Grep-Gate gegen Tailwind-3-Idiome). Kommentar an Chief of Staff statt
 weiterarbeiten.
+
+**Ein *rotes* `pr-build` hält genauso auf wie ein fehlendes.** Beides heißt, dass Regel 3 an diesem Kind
+nicht automatisch nachgewiesen ist; also wird auch dann nicht in den Stack gemergt. Der Unterschied liegt
+nur im Auffallen: rot siehst du in der PR-Ansicht, fehlend nicht — deshalb steht oben der API-Weg.
+
+**An einem Kind-PR gegen einen Stack-Branch erzwingt kein Check etwas.** Dort ist `pr-build`
+**nicht erforderlich**, sondern nur informativ: das Ruleset `main: pr-build required` ist auf `~DEFAULT_BRANCH`
+konditioniert — nicht auf das Literal `main` — und ein zweites Ruleset gibt es nicht; `stack/**` ist damit
+per Konstruktion von keinem erfasst, und man kann einen Stack-Branch auch nicht versehentlich in den
+Geltungsbereich hineinbenennen (gemessen am 2026-10-02, nur gelesen: genau **ein** Ruleset im Repository,
+`conditions.ref_name.include: ["~DEFAULT_BRANCH"]`, `bypass_actors: []` — Details in
+**Runtime-Realität**, „`main` ist per Ruleset geschützt"). Ein rotes oder fehlendes `pr-build` macht einen
+Kind-PR gegen einen Stack-Branch also nicht unmergebar — das ist aus dem Ruleset-Befund hergeleitet, am
+Kind-PR selbst haben wir es nicht gemessen. Was dort weiter blockt, sind etwa Merge-Konflikte; der Check
+tut es nicht. Die Disziplin des Implementers, der den roten oder fehlenden Haken sieht, ist dort das ganze
+Gate: an einem Kind-PR gegen einen Stack-Branch ist *Das Gate* eine Verhaltensregel, keine Mechanik.
+
+**Das ist keine zu schließende Lücke.** Board-Entscheidung vom 2026-10-03, Variante **C**
+([PRI-165](/PRI/issues/PRI-165)): nur Dokumentation, **kein** Ruleset auf `stack/**`. Der harte, erzwungene
+Schutz sitzt bewusst eine Ebene höher, dort, wo er den Live-Deploy abfängt — am Sammel-PR
+`stack/** → main`, an dem `pr-build` mit `strict_required_status_checks_policy: true` Pflicht und
+`bypass_actors` leer ist. Melde das fehlende Stack-Ruleset nicht erneut als Finding und lege es nicht an
+(Regel 14). Das Board hat die Ruleset-Variante nicht gewählt; eine Begründung nennt die Entscheidung
+nicht. Kosten, Nebenwirkungen und die zwei ungemessenen Einwände, die ein Umsetzungs-Issue für ein
+Ruleset auf `stack/**` zuerst klären müsste, stehen in [PRI-165](/PRI/issues/PRI-165).
 
 ---
 
