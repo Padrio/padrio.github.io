@@ -30,30 +30,71 @@ Diese Datei wird automatisch gelesen und ist die maßgebliche Quelle für Projek
 ```bash
 npm ci        # Dependencies installieren (reproduzierbar, nutzt package-lock.json)
 npm run dev   # Dev-Server auf http://localhost:4321
-npm run build # Statischer Build nach dist/ — eines der beiden Qualitätsgates
+npm run build # Statischer Build nach dist/ — Qualitätsgate; enthält zusätzlich das Bild-Gate (s. u.)
 npm run preview # Build lokal ausliefern
 ```
 
-Es gibt **keine Tests und keinen Linter**. Automatisch geprüft wird an genau zwei Stellen, beide in
-`.github/workflows/pr-build.yml`: `npm run build`, und davor ein Grep-Gate, das Tailwind-3-Idiome in
-`src/` ablehnt (`shadow-sm`, `theme(`, `*-opacity-*`, nacktes `ring`, …). Die vollständige Liste
-steht samt Begründung und der richtigen Ersetzung als Kommentar direkt bei der Liste im Workflow.
-Grund für das zweite Gate ist [PRI-80](/PRI/issues/PRI-80): eine Klasse, die unter Tailwind 4 nur noch semantisch falsch
+Es gibt **keine Tests und keinen Linter**. Automatisch geprüft wird an genau drei Stellen, und nur
+zwei davon liegen in `.github/workflows/pr-build.yml`: `npm run build`, und davor ein Grep-Gate, das
+Tailwind-3-Idiome in `src/` ablehnt (`shadow-sm`, `theme(`, `*-opacity-*`, nacktes `ring`, …). Die
+vollständige Liste steht samt Begründung und der richtigen Ersetzung als Kommentar direkt bei der
+Liste im Workflow. Grund für das zweite Gate ist [PRI-80](/PRI/issues/PRI-80): eine Klasse, die unter Tailwind 4 nur noch semantisch falsch
 ist, baut grün durch — ohne Linter meldet das sonst nichts.
+
+**Das dritte Gate steht in keinem Workflow, sondern in `npm run build` selbst.** Es steht hier, damit
+du es findest, *bevor* es dich rot macht:
+
+- **Wo:** `plugins/assert-content-images.mjs`, eingehängt als Astro-Integration `assertContentImages()`
+  in `astro.config.mjs` — nicht in `.github/workflows/`, dort steht dazu nichts.
+- **Wann:** im Hook `astro:build:done`, also bei **jedem** `npm run build` — lokal genauso wie im
+  `pr-build`-Lauf. Es ist **kein Workflow-Schritt**: wer es in `pr-build.yml` sucht, findet es nicht,
+  und ein grüner Build ohne diese Zeile im Log gibt es nicht.
+- **Was:** das gebaute `dist/` gegen `src/content/projects/*.md`. Jedes Bild, das das Markdown eines
+  Projekts referenziert, muss in der erzeugten Seite stehen **und** `loading="lazy"` plus die
+  `width`/`height` aus dem WebP-Header der Datei tragen; das Hero-Bild aus dem Frontmatter muss
+  umgekehrt **ohne** `loading`-Attribut gerendert sein (es liegt above the fold und bleibt eager).
+  Nicht gemessen werden entfernte (`https:`, `//host`) und ko-lokalisierte Bilder, die Astros eigene
+  Asset-Pipeline übernimmt — ihre Anwesenheit wird geprüft, ihre Attribute nicht.
+- **Grün** ist eine `logger.info`-Zeile im Build-Log, heute mit acht Bildern:
+  `[assert-content-images] 8 markdown image(s) carry loading="lazy" and their file's width/height; every hero is eager`
+  (um `; N image(s) present but not measured …` ergänzt, sobald es ein nicht gemessenes Bild gibt).
+- **Rot** ist ein `throw` mit der Problemliste — `[assert-content-images] N problem(s):` und darunter
+  eine Zeile pro Problem, die in der Regel Slug und `src` benennt — und damit Exit 1 für den Build.
+
+Getroffen wird davon, wer ein Markdown-Bild anfasst, ein Projekt-Markdown anlegt oder eine Bilddatei
+austauscht; der Grund für jede einzelne Entscheidung darin steht ausführlich im Kopf der Datei, und
+das Verhalten ist in [PRI-285](/PRI/issues/PRI-285) in vier Runden reviewt. **Eine Lücke nennt die
+Datei selbst:** ein handgeschriebenes `<img>` direkt im Markdown erreicht weder das hast-Plugin noch
+den Scanner dieses Gates und geht unbemerkt durch — bewusst so, weil die Pipeline ein solches Tag
+nicht korrigieren kann.
 
 ---
 
 ## Struktur
 
 ```
-astro.config.mjs              site, Integrationen (icon, sitemap), Tailwind als Vite-Plugin, Redirects (Meta-Refresh, s. Regel 10)
+astro.config.mjs              site, drei Integrationen (icon, sitemap, assertContentImages — das
+                              dritte Gate aus plugins/, s. Abschnitt Befehle), markdown.processor
+                              (satteri mit dem hast-Plugin aus plugins/), Tailwind als Vite-Plugin,
+                              Redirects (Meta-Refresh, s. Regel 10)
 tailwind.config.mjs           Tailwind-Theme (u. a. max-w-content); `content` ist unter Tailwind 4 wirkungslos
 .cursorrules                  Design-System „Warm Minimalist" im Detail (Quelle für Regel 4)
 .github/workflows/deploy.yml  GitHub-Pages-Deploy (Push auf main + workflow_dispatch)
 .github/workflows/pr-build.yml  PR-Gate bei jedem PR gegen main (required status check): erst ein
                               Grep-Gate gegen Tailwind-3-Idiome in src/, dann npm ci + npm run build
+plugins/satteri-content-images.mjs  Sätteri-hast-Plugin: setzt an jedem <img>, das das Markdown eines
+                              Projekts rendert, loading="lazy" und die width/height aus dem
+                              WebP-Header der Datei; hängt an markdown.processor in astro.config.mjs
+plugins/assert-content-images.mjs  Das dritte automatische Gate (Abschnitt Befehle): prüft in
+                              astro:build:done das gebaute dist/ gegen src/content/projects/*.md und
+                              macht npm run build rot, wenn ein Markdown-Bild die Attribute nicht
+                              trägt oder ein Hero-Bild lazy geworden ist. Liegt bewusst hier und
+                              nicht im Plugin: ein throw im Markdown-Render endet mit Exit 0,
+                              einer in astro:build:done mit 1 (Regel 3)
 public/CNAME                  Custom Domain pkrason.de
 public/favicon.svg
+public/robots.txt             User-agent: * / Allow: / plus Sitemap-Verweis auf
+                              https://pkrason.de/sitemap-index.xml (den @astrojs/sitemap erzeugt)
 public/images/**              Bilder ausschließlich als WebP (Regel 6), mit genau einer Ausnahme —
                               siehe den Eintrag og-image.png unten
 public/images/profile.webp    Profilfoto im Hero, 264x264 (2x für die 132-px-Darstellung)
@@ -116,10 +157,10 @@ Die Detailseite wird für **jedes** Projekt erzeugt, unabhängig von `featured`.
    **Präzisierung für Stacks, vom Board am 2026-10-02 freigegeben ([PRI-155](/PRI/issues/PRI-155)):** Ein Agent darf einen vollständig reviewten Kind-PR in einen `stack/**`-Branch mergen — und nur dorthin. Direkte Commits auf `stack/**` sind verboten. Alles übrige an Regel 1 bleibt unverändert. Das Verfahren steht im Abschnitt **Stacked Pull-Requests**; dies ist wie der Self-Merge eine Präzisierung von Regel 1 und keine neue Regel — die Nummerierung bleibt bei 14.
 2. **Git-Identität:** Der **Commit-Author** ist „Pascal Krason <p.krason@icloud.com>" und wird verbindlich per `git commit --author="Pascal Krason <p.krason@icloud.com>"` gesetzt. Der **Committer** ist die Laufzeit-Identität des Workspace und wird nicht umgangen — insbesondere nicht durch einen direkten Aufruf von `/usr/bin/git`, mit dem ein Agent eine Laufzeitkontrolle über die Commit-Attribution unterlaufen würde. **Keine `Co-Authored-By`-Zeilen** in Commits oder PR-Beschreibungen — weder Claude noch Paperclip. Claude Code fügt sie standardmäßig hinzu; prüfe jede Commit-Message und jeden PR-Body, bevor du ihn abschickst.
    *Die Regel bindet den Branch-Commit. Was beim Merge auf `main` aus dem Author wird, entscheidet GitHub — siehe **Runtime-Realität**, „Der Commit-Author liegt beim Agent, der Committer nicht".*
-3. **Vor jedem PR muss `npm run build` fehlerfrei durchlaufen.** Das Ergebnis wird im zugehörigen Issue dokumentiert. Es gibt weder Tests noch Linter — der Build ist das eine von zwei Qualitätsgates; das zweite ist das Grep-Gate gegen Tailwind-3-Idiome, das im selben Workflow **vor** `npm ci` läuft (Abschnitt *Befehle*). Seit dem 2026-09-30 ist diese Regel zusätzlich technisch erzwungen: der Status-Check `pr-build` ist auf dem Default-Branch per Ruleset Pflicht, ein PR mit rotem oder fehlendem `pr-build` ist nicht mergebar (siehe **Runtime-Realität**, „`main` ist per Ruleset geschützt").
+3. **Vor jedem PR muss `npm run build` fehlerfrei durchlaufen.** Das Ergebnis wird im zugehörigen Issue dokumentiert. Es gibt weder Tests noch Linter — der Build ist eines von drei Qualitätsgates; das zweite ist das Grep-Gate gegen Tailwind-3-Idiome, das im selben Workflow **vor** `npm ci` läuft, das dritte das Bild-Gate `plugins/assert-content-images.mjs`, das *innerhalb* von `npm run build` feuert und deshalb auch lokal (beide im Abschnitt *Befehle*). Seit dem 2026-09-30 ist diese Regel zusätzlich technisch erzwungen: der Status-Check `pr-build` ist auf dem Default-Branch per Ruleset Pflicht, ein PR mit rotem oder fehlendem `pr-build` ist nicht mergebar (siehe **Runtime-Realität**, „`main` ist per Ruleset geschützt").
    **Seit dem 2026-10-02 gilt das Gate zusätzlich gegen den aktuellen Stand von `main`** (Board-Entscheidung auf [PRI-108](/PRI/issues/PRI-108)): im Ruleset `main: pr-build required` steht jetzt `strict_required_status_checks_policy: true`, Required-Check unverändert `pr-build`, `bypass_actors: []`. Ein grünes `pr-build` heißt damit „grün gegen den **aktuellen** `main`" und nicht mehr „grün gegen die Branch-Basis von damals" — in [PRI-80](/PRI/issues/PRI-80) zählte deshalb für PR #13 ein `pr-build`, das am 2026-09-30 gegen die Basis vor der Tailwind-4-Migration grün geworden war und 15 Stunden später mitgemerged wurde. **Der Schalter allein hätte PR #13 aber nicht gestoppt:** er hätte den Branch nur neu gebaut, und `shadow-sm` kompiliert unter Tailwind 4 anstandslos — es bedeutet dort nur den alten `shadow`. Was diese Klasse Regression wirklich sieht, ist das Grep-Gate, das [PRI-80](/PRI/issues/PRI-80) als Abhilfe gebracht hat. Beide Gates greifen erst zusammen. Der Preis: ist `main` weitergelaufen, seit dein Branch abgezweigt oder zuletzt nachgezogen wurde, blockiert GitHub den Merge, bis der Branch nachgezogen ist. Das ist **kein Fehler und kein Blocker**, sondern der Normalfall, sobald ein anderer Autor seinen PR merged, während deiner offen ist. Nachziehen (Rebase oder „Update branch") und den neuen `pr-build`-Lauf abwarten ist Aufgabe des PR-Autors — siehe **Arbeitsablauf**, Schritt 5.
    *Trotzdem bleibt der lokale Build Pflicht, und grünes `pr-build` ist kein Korrektheitsbeweis: der Build kompiliert nur, was tatsächlich erreicht wird. Toter Code kommt grün durch — ein Import auf eine nicht existierende Datei fällt nicht auf, solange das importierende Modul nirgends gerendert wird. Lies aus dem Gate also nie „CI prüft das schon"; was der Build nicht abdeckt, musst du selbst prüfen.*
-   **Die gravierendste bekannte Ausprägung davon geht über toten Code hinaus: ein `throw` während des Markdown-Renderings liefert eine ausgeweidete Seite statt eines roten Builds.** Astros glob-loader fängt den `throw`, loggt `[ERROR] [glob-loader] Error rendering <datei>.md` — und der Build endet trotzdem mit **Exit 0**. Ausgeliefert wird eine Projektseite mit **leerem** `.prose-project`. Ein `throw` in `astro:build:done` beendet den Build dagegen mit 1. Beide automatischen Gates sehen das nicht: `npm run build` ist grün, und das Grep-Gate gegen Tailwind-3-Idiome sieht Markdown-Rendering ohnehin nicht. Gemessen beim Bau von [PRI-126](/PRI/issues/PRI-126), unabhängig reproduziert vom Code Auditor in [PRI-278](/PRI/issues/PRI-278) und vom QA Auditor in [PRI-279](/PRI/issues/PRI-279): mit dem Markdown-Plugin aus PRI-126 fiel `/projects/konteo-provision/` von 26.416 auf 16.547 Byte, auf der ganzen Seite blieb ein einziger `<img>` übrig — das Hero-Bild aus `src/pages/projects/[slug].astro`, das außerhalb von `.prose-project` liegt (alle drei Messungen 16.547 Byte). **Diese Zahlen gelten für diese eine Seite, dieses eine Plugin und den Template-Stand von PRI-126** — nicht auf andere Projektseiten übertragen. Die Fehlerklasse hängt nicht an dem Plugin, sondern am glob-loader; auf dem heutigen `main` ist sie latent, weil es dort kein Markdown-Plugin gibt, und sie trifft den nächsten Agent, der eines schreibt. **Ein Gate dagegen existiert auf `main` heute nicht.** Wer eines will, ist ein eigenes Issue; hier steht nur, was gemessen ist.
+   **Die gravierendste bekannte Ausprägung davon geht über toten Code hinaus: ein `throw` während des Markdown-Renderings liefert eine ausgeweidete Seite statt eines roten Builds.** Astros glob-loader fängt den `throw`, loggt `[ERROR] [glob-loader] Error rendering <datei>.md` — und der Build endet trotzdem mit **Exit 0**. Ausgeliefert wird eine Projektseite mit **leerem** `.prose-project`. Ein `throw` in `astro:build:done` beendet den Build dagegen mit 1. Die beiden Workflow-Gates sehen das nicht: `npm run build` ist grün, und das Grep-Gate gegen Tailwind-3-Idiome sieht Markdown-Rendering ohnehin nicht. Gemessen beim Bau von [PRI-126](/PRI/issues/PRI-126), unabhängig reproduziert vom Code Auditor in [PRI-278](/PRI/issues/PRI-278) und vom QA Auditor in [PRI-279](/PRI/issues/PRI-279): mit dem Markdown-Plugin aus PRI-126 fiel `/projects/konteo-provision/` von 26.416 auf 16.547 Byte, auf der ganzen Seite blieb ein einziger `<img>` übrig — das Hero-Bild aus `src/pages/projects/[slug].astro`, das außerhalb von `.prose-project` liegt (alle drei Messungen 16.547 Byte). **Diese Zahlen gelten für diese eine Seite, dieses eine Plugin und den Template-Stand von PRI-126** — nicht auf andere Projektseiten übertragen. Die Fehlerklasse hängt nicht an dem Plugin, sondern am glob-loader. **Der Vorbehalt „auf dem heutigen `main`", unter dem dieser Absatz in [PRI-282](/PRI/issues/PRI-282) geschrieben wurde, ist mit dem Merge von Stack 1 eingelöst** ([PRI-160](/PRI/issues/PRI-160), PR [#65](https://github.com/Padrio/padrio.github.io/pull/65)): `main` hat seitdem beides, was der Absatz dort verneinte — ein Markdown-Plugin (`plugins/satteri-content-images.mjs`) und ein Gate dagegen (`plugins/assert-content-images.mjs`, Abschnitt *Befehle*). Das Gate nimmt genau den Weg, den der Absatz als den wirksamen nennt: es prüft nicht den Render, sondern das gebaute `dist/`, und wirft in `astro:build:done`. **Es deckt die Fehlerklasse aber nur so weit, wie sie die Projekt-Bilder betrifft** — eine ausgeweidete `.prose-project` verliert ihre `<img>`-Tags und wird damit rot; ein `throw` an einer Stelle, die kein Markdown-Bild berührt, kommt weiter mit Exit 0 durch. Die Lücke am glob-loader selbst ist nicht geschlossen, und wer sie schließen will, ist ein eigenes Issue; hier steht nur, was gemessen ist.
 4. **Design-System „Warm Minimalist"** (siehe `.cursorrules`): kein Dark Mode, keine Tech-/Cyberpunk-Ästhetik, kein Glassmorphism/`backdrop-blur`. Basis `stone-50`, weiße Karten mit dezenten Schatten, Akzent orange/rose. Mobile first. Bewusste A11y-Entscheidungen beibehalten: kleine Texte **auf hellem Grund** mindestens `stone-500` (nicht `stone-400`), Nav-CTA `orange-700`.
    **Geltungsbereich der `stone-500`-Vorgabe: heller Grund.** Sie ist eine Kontrastvorgabe, keine Farbvorliebe. Auf `bg-stone-50` misst `stone-500` 4,58:1 und besteht AA knapp, `stone-400` nur 2,48:1 und fällt durch — daher die Vorgabe. Auf dunklem Grund kippt das Vorzeichen, und dort gilt: **der kontraststärkere Wert gewinnt**, auch wenn er heller ist als `stone-500`. Beispiel ist der Untertitel im Kontakt-Strip von `src/pages/index.astro` (`text-[17px] text-stone-400` auf `bg-stone-900`; greppbar als der Absatz unter `// Let's talk` im Block `id="contact"`): gemessen **6,76:1, AA bestanden**; `stone-500` käme an derselben Stelle auf **3,65:1** und würde AA brechen. Die Vorgabe wörtlich auf eine dunkle Sektion anzuwenden verschlechtert also genau das, was sie schützen soll — nicht tun. Entschieden vom Board am 2026-10-03 auf [PRI-140](/PRI/issues/PRI-140): der Regeltext wird präzisiert, der Code bleibt.
    **Die Untergrenze ist in beiden Zweigen dieselbe: 4,5:1 (WCAG AA, 1.4.3)** für kleinen Text, unabhängig von der Helligkeit des Grundes. „Der kontraststärkere Wert gewinnt" entscheidet nur zwischen Kandidaten, die AA bereits bestehen — der Komparativ ersetzt die Schwelle nicht. Sonst berät die Regel korrekt in ein AA-Versagen hinein: auf `bg-stone-800` misst `stone-500` 3,17:1 und `stone-600` 1,99:1, der Komparativ wählt also `stone-500` und bleibt trotzdem unter der Schwelle, weil **beide** Kandidaten darunter liegen (richtig wäre dort `stone-400` mit 5,87:1). Wer eine neue dunkle Fläche einführt, rechnet den Wert also nach und wählt nicht nur den besseren von zwei.
@@ -545,9 +586,9 @@ Kind-PR eines neuen Stacks, bevor du dich auf das Gate verlässt. „Kein Check"
 nicht in der PR-Ansicht**: `pull-request-read` mit `method: get_check_runs`; vorhanden ist der Check, wenn
 `total_count ≥ 1` ist **und** ein Eintrag `name: "pr-build"` trägt. Ein fehlender Check sieht im UI nicht
 wie ein Fehler aus — genau diese Fehlerklasse ist hier gemeint. Läuft an einem Kind-PR gegen `stack/**`
-**kein** Check, wird nicht gemergt: dann fehlen beide automatischen Qualitätsgates des Projekts (Regel 3 —
-`npm run build` und das Grep-Gate gegen Tailwind-3-Idiome). Kommentar an Chief of Staff statt
-weiterarbeiten.
+**kein** Check, wird nicht gemergt: dann fehlen **alle drei** automatischen Qualitätsgates des Projekts
+(Regel 3 — das Grep-Gate gegen Tailwind-3-Idiome, `npm run build`, und das Bild-Gate, das *in* diesem
+Build feuert und mit ihm ausfällt). Kommentar an Chief of Staff statt weiterarbeiten.
 
 **Ein *rotes* `pr-build` hält genauso auf wie ein fehlendes.** Beides heißt, dass Regel 3 an diesem Kind
 nicht automatisch nachgewiesen ist; also wird auch dann nicht in den Stack gemergt. Der Unterschied liegt
