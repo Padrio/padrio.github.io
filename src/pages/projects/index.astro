@@ -32,10 +32,8 @@ const sortedProjects = projects.sort(
     {/* data-reveal lives on the wrapper, not the <a>: the reveal rule in
         global.css is unlayered, so its `transition` shorthand would beat the
         anchor's transition-colors out of @layer utilities. Same convention as
-        the back link in [slug].astro — except for the hover colour: that one is
-        still orange-600 and belongs to PRI-137, this one starts at orange-700
-        for the reason given on the eyebrow below. The divergence is deliberate
-        and temporary; do not "repair" it back to orange-600. */}
+        the back link in [slug].astro, hover colour included: both rest at
+        stone-500 and hover at orange-700 (PRI-137). */}
     <div data-reveal>
       <a
         href="/"
@@ -49,13 +47,13 @@ const sortedProjects = projects.sort(
     </div>
 
     <div data-reveal class="mb-10 sm:mb-14">
-      {/* orange-700, not the orange-600 the home page eyebrow still uses: at
-          11.5px this is small text, and rule 4 puts its floor at stone-500,
-          which measures 4.58:1 on stone-50 — orange-600 is 3.43:1 and under it.
-          Both numbers are rasterised through a 1x1 canvas, because Tailwind 4
-          hands out raw oklch() and a parser over that text invents plausible
-          numbers; CLAUDE.md records the same 4.58. PRI-137 owns the 20
-          pre-existing sites; this file is new, so it starts at the target. */}
+      {/* orange-700: at 11.5px this is small text, and rule 4 puts its floor at
+          stone-500, which measures 4.58:1 on stone-50 — orange-600 is about
+          3.4:1 and under it. Both numbers are rasterised through a 1x1 canvas,
+          because Tailwind 4 hands out raw oklch() and a parser over that text
+          invents plausible numbers; CLAUDE.md records the same 4.58. The two
+          other eyebrow labels, in index.astro and CareerTimeline.astro, carry
+          the same token since PRI-137. */}
       <p class="font-mono text-[11.5px] tracking-[0.16em] text-orange-700 uppercase mb-3.5">Portfolio</p>
       <h1 class="font-extrabold text-[clamp(2.25rem,7vw,3.25rem)] leading-[1.05] tracking-[-0.035em] text-stone-900">
         All Projects
