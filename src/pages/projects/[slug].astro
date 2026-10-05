@@ -331,11 +331,13 @@ const projectJsonLd = {
     tocLinks.forEach((link) => {
       const isCurrent = link.dataset.tocLink === current;
       link.classList.toggle('toc-active', isCurrent);
-      // The class only carries colour and the left rule, so the spy's one piece of
-      // information never reaches a screen reader without this. "location" is the
-      // aria-current token for the current position inside a set of sections.
+      // Expose the same state to assistive tech; "location" is the aria-current
+      // token for the current position within a set of sections. Write only on a
+      // real change: unlike classList.toggle, setAttribute is never a no-op.
       if (isCurrent) {
-        link.setAttribute('aria-current', 'location');
+        if (link.getAttribute('aria-current') !== 'location') {
+          link.setAttribute('aria-current', 'location');
+        }
       } else {
         link.removeAttribute('aria-current');
       }
