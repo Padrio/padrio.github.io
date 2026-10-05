@@ -23,7 +23,7 @@ Diese Datei wird automatisch gelesen und ist die maßgebliche Quelle für Projek
 | Icons | `astro-icon` 1.2 mit `@iconify-json/simple-icons` |
 | SEO | `@astrojs/sitemap` |
 | Fonts | `@fontsource/inter` und `@fontsource/jetbrains-mono` — selbst gehostet, keine externen Requests |
-| Analytics | Microsoft Clarity (`@microsoft/clarity`), Projekt-ID in `src/layouts/Layout.astro` |
+| Analytics | Microsoft Clarity (`@microsoft/clarity`), Projekt-ID (`CLARITY_PROJECT_ID`) und `Clarity.init` in `src/scripts/consent.js` — seit [PRI-123](/PRI/issues/PRI-123) hinter dem Consent-Gate, geladen erst nach dem Opt-in. In `src/layouts/Layout.astro` steht dazu nichts. |
 
 ### Befehle
 
@@ -64,7 +64,10 @@ public/images/projects/*.webp Projekt-Screenshots
 src/content.config.ts         Schema der Content Collection "projects" (Zod, Content Layer API)
 src/content/projects/*.md     Ein Markdown-File pro Projekt, Frontmatter nach obigem Schema
 src/layouts/Layout.astro      HTML-Grundgerüst: Meta-/OG-/Twitter-Tags, Person-JSON-LD,
-                              Fonts, Clarity-Init, Skip-Link, Navigation, Footer, reveal.js
+                              Fonts, Skip-Link, Navigation, Footer, <ConsentBanner />, reveal.js.
+                              Im <head> steht bewusst nichts zu Clarity — ein statischer Import
+                              oder ein Preconnect dort wäre ein Kontakt vor der Einwilligung;
+                              Projekt-ID und Init liegen in src/scripts/consent.js
 src/pages/index.astro         Startseite: Hero, CareerTimeline, "Selected Works", Kontakt-Strip
 src/pages/projects/[slug].astro  Projekt-Detailseite: getStaticPaths über die Collection,
                               Prev/Next, Lesezeit, Scroll-Spy-TOC, SoftwareApplication-JSON-LD
