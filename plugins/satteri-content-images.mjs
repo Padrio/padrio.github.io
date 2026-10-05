@@ -162,6 +162,15 @@ export default {
       // which is the one failure class this change fights in three other places. Excluding the
       // shape here is also what makes the gate's ABSOLUTE_URL branch reachable for it rather
       // than dead code.
+      //
+      // The one thing the guard takes away, named rather than glossed: `//images/x.webp` with
+      // the file actually present in public/ used to get the attributes, because canvasSizeFor
+      // strips leading slashes and resolved it anyway. It no longer does. That is the right
+      // trade — a browser reads `//images/…` as host `images`, so the image is broken there
+      // whether or not it carries a width — and it ends a disagreement rather than starting
+      // one: the gate already classified that same src as remote-unmeasurable via ABSOLUTE_URL
+      // while this visitor was measuring it. Measured at both heads, the build stays green
+      // either way; what changes is that the emitted tag loses loading/width/height.
       if (typeof src !== 'string' || !src.startsWith('/') || src.startsWith('//')) return;
 
       // An author-set attribute wins. Both guards below are unreachable from a .md today, and
