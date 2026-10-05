@@ -32,9 +32,8 @@ const sortedProjects = projects.sort(
     {/* data-reveal lives on the wrapper, not the <a>: the reveal rule in
         global.css is unlayered, so its `transition` shorthand would beat the
         anchor's transition-colors out of @layer utilities. Same convention as
-        the back link in [slug].astro, and since PRI-137 the same hover colour
-        too: the orange-600/orange-700 divergence this comment used to call
-        deliberate and temporary is resolved — both hover at orange-700. */}
+        the back link in [slug].astro, hover colour included: both rest at
+        stone-500 and hover at orange-700 (PRI-137). */}
     <div data-reveal>
       <a
         href="/"
@@ -49,12 +48,12 @@ const sortedProjects = projects.sort(
 
     <div data-reveal class="mb-10 sm:mb-14">
       {/* orange-700: at 11.5px this is small text, and rule 4 puts its floor at
-          stone-500, which measures 4.58:1 on stone-50 — orange-600 is 3.43:1 and
-          under it. Both numbers are rasterised through a 1x1 canvas, because
-          Tailwind 4 hands out raw oklch() and a parser over that text invents
-          plausible numbers; CLAUDE.md records the same 4.58. This file started at
-          the target while the pre-existing sites were still orange-600; PRI-137
-          has since moved those, so the home page eyebrow now matches. */}
+          stone-500, which measures 4.58:1 on stone-50 — orange-600 is about
+          3.4:1 and under it. Both numbers are rasterised through a 1x1 canvas,
+          because Tailwind 4 hands out raw oklch() and a parser over that text
+          invents plausible numbers; CLAUDE.md records the same 4.58. The two
+          other eyebrow labels, in index.astro and CareerTimeline.astro, carry
+          the same token since PRI-137. */}
       <p class="font-mono text-[11.5px] tracking-[0.16em] text-orange-700 uppercase mb-3.5">Portfolio</p>
       <h1 class="font-extrabold text-[clamp(2.25rem,7vw,3.25rem)] leading-[1.05] tracking-[-0.035em] text-stone-900">
         All Projects
