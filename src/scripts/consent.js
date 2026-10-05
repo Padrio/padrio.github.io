@@ -224,8 +224,12 @@ const CLARITY_PRECONNECT_HOSTS = [
  * TLS handshake against Microsoft while the head is parsed, which hands a
  * third-country recipient the visitor's IP address before they have agreed to
  * anything — exactly what the banner exists to prevent. Here it cannot fire
- * before a grant, and the request it warms is at most a few dozen milliseconds
- * behind it either way.
+ * before a grant, and the requests it warms follow that grant immediately:
+ * measured on the live site, 82 ms median from the opt-in click to the
+ * recorder's first response byte. The name carries that precondition because
+ * nothing enforces it — any new caller of `loadClarity()` has to be behind a
+ * grant too, since this is where the connection to the third-country recipient
+ * is opened.
  *
  * No `crossorigin` attribute. Clarity injects both hosts as plain script tags,
  * which are no-CORS requests and use the credentialed socket pool; a hint
@@ -233,12 +237,21 @@ const CLARITY_PRECONNECT_HOSTS = [
  * request can claim. Measured on the live site: without the attribute the
  * recorder reused the open socket in 8 of 8 page views, with it in 0 of 3.
  */
-function preconnectClarity() {
-  for (const host of CLARITY_PRECONNECT_HOSTS) {
-    const link = document.createElement('link');
-    link.rel = 'preconnect';
-    link.href = host;
-    document.head.appendChild(link);
+function preconnectClarityAfterGrant() {
+  try {
+    for (const host of CLARITY_PRECONNECT_HOSTS) {
+      const link = document.createElement('link');
+      link.rel = 'preconnect';
+      link.href = host;
+      document.head.appendChild(link);
+    }
+  } catch {
+    // A hint is an optimisation and must not take the consent path with it.
+    // Without the `try` a throw in here would escape `loadClarity()`, and its
+    // first caller is `grantConsent()`, one line above `storeDecision()` — the
+    // visitor's grant would never be recorded and the banner would never close.
+    // Every other optional side effect in this file is shielded for the same
+    // reason; without the hint Clarity loads exactly as before, just colder.
   }
 }
 
@@ -257,10 +270,12 @@ function preconnectClarity() {
  */
 function loadClarity() {
   if (!clarityLoad) {
-    // Before the import, not after: the import resolving is what triggers the
-    // first request to `www.clarity.ms`, so the hint has to be in flight while
-    // the chunk is still being fetched to buy anything at all.
-    preconnectClarity();
+    // Before the chunk resolves, not inside the `.then()`: the request to
+    // `www.clarity.ms` is issued by `Clarity.init()` below, so the hint only
+    // buys the round trips it overlaps — it has to be in flight while the
+    // same-origin chunk is still being fetched. Its position relative to the
+    // `import()` on the next line is immaterial, both run in the same task.
+    preconnectClarityAfterGrant();
     clarityLoad = import('@microsoft/clarity')
       .then(({ default: Clarity }) => {
         Clarity.init(CLARITY_PROJECT_ID);
