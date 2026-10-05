@@ -50,7 +50,9 @@ const CHANGE_EVENT = 'pk-consent-change';
 //     session token — not just the ones whose record had lapsed on its own. See
 //     `applyStoredDecision`.
 //   - Every document still open from the previous build reloads once, as soon as
-//     a visitor answers the new question in another tab. That document's
+//     a visitor answers the new question in another tab — or, for a document
+//     that missed that event because it was frozen, as soon as it returns to
+//     the foreground (see `watchOtherTabs`). That document's
 //     `readDecision` runs the old number, so it reads the new record as no
 //     decision, and `enforceDecision` tears it down — including the `_clck` the
 //     answering tab has just written. The outcome is right and self-healing (new
@@ -140,6 +142,30 @@ export function readDecision() {
   // that will not expire for as long as it is ahead".
   if (age < 0 || age > CONSENT_MAX_AGE_MS) return null;
   return decision;
+}
+
+/**
+ * Whether the store holds a record at all — any string, accepted or not.
+ *
+ * This is not a weaker `readDecision`, it splits a state `readDecision`
+ * deliberately merges. "No accepted decision" covers both *a record this module
+ * no longer accepts* — lapsed by age, written under another `CONSENT_VERSION`,
+ * dated in the future, corrupted, or a value some other script put there — and
+ * *nothing stored at all*. Every caller that only needs to know whether to
+ * track is right not to care; the `visibilitychange` handler in
+ * `watchOtherTabs` is the one that is not, and it is the only caller here. See
+ * there for the measurement that makes the distinction load-bearing.
+ *
+ * An unreadable store counts as nothing stored. `getItem` throwing is the
+ * private-browsing configuration `readDecision` is already guarded for, and
+ * there is no record to be had there either.
+ */
+function hasStoredRecord() {
+  try {
+    return typeof window.localStorage.getItem(STORAGE_KEY) === 'string';
+  } catch {
+    return false;
+  }
 }
 
 function storeDecision(value) {
@@ -296,6 +322,10 @@ export function denyConsent() {
  *     the banner back up. Honouring that grant would need a second source of
  *     truth for the decision beside the store, and fail-closed is the better
  *     trade for a tracker. Measured and accepted, not missed (PRI-231, S1).
+ *     That acceptance covers the two callers that can reach here with an empty
+ *     store. The `visibilitychange` listener excludes the state before calling
+ *     at all, because its trigger makes the same cost a different thing — see
+ *     `watchOtherTabs`.
  *   - A consent that lapsed while the document stayed open: `readDecision`
  *     enforces a version and a maximum age, so a document can outlive its own
  *     record. Reloading is exactly right there, and it is also the only thing
@@ -321,9 +351,10 @@ function enforceDecision(decision) {
 let watching = false;
 
 /**
- * Propagates a decision this document did not see being made into it. Two ways
- * it can miss one, and they are not covered to the same depth — the second
- * bullet says where it stops.
+ * Keeps this document's behaviour tied to the decision that is actually in
+ * force, rather than to the one it loaded with. Three ways the two can come
+ * apart, covered by three listeners and not to the same depth — the second and
+ * third sections say where each stops.
  *
  * **Another tab.** `onDecisionChange` listens for a `document` event, which
  * never crosses a tab boundary, so without this a visitor who withdraws consent
@@ -357,6 +388,49 @@ let watching = false;
  * direction is a separate question — the `denied` → `granted` route on
  * /privacy/ is with QA in PRI-204 — and widening this handler into it would be
  * a scope change, not a fix.
+ *
+ * **Its own consent lapsing where it lies.** Neither event above fires for a
+ * document that simply stays open while the consent it is running on stops
+ * counting. `readDecision` enforces a version and a maximum age; `clarityLoad`
+ * does not expire with either, so a tab that outlives the age limit keeps
+ * sending until the visitor navigates or comes back. `visibilitychange` is the
+ * point at which such a document is guaranteed to run code again. At 365 days
+ * that is the completeness case and not an urgent one — it is practically
+ * unreachable today, and the reason to close it anyway is that otherwise the
+ * mediation hangs on a number no gate checks: shortening `CONSENT_MAX_AGE_MS`
+ * would turn it into a live hole with nothing to say so. It also covers the
+ * realistic variant of the first section: a background document Chrome froze,
+ * whose task queues were paused when the `storage` event was dispatched. Whether
+ * such an event is redelivered after a resume is **not measured** — a frozen
+ * document could not be produced in this workspace (`Page.setWebLifecycleState`
+ * acknowledges the state without entering it), so this listener covers that case
+ * by not depending on the answer (PRI-234, from the security review as S2).
+ *
+ * **Why that one listener reads the store twice.** It enforces only when the
+ * store actually holds a record, which neither listener above requires. The
+ * state that separates them is a grant whose `setItem` threw: Clarity is
+ * running, the store is empty, `readDecision` reports no decision, and
+ * `enforceDecision` therefore tears the visitor's own answer down. On `pageshow`
+ * that costs one reload per grant and only on a back navigation — measured,
+ * accepted, and written up in `enforceDecision`. An ordinary tab switch is a far
+ * more frequent trigger, and with it the same state stops being a one-off cost:
+ * measured on the unguarded handler, every "Allow" bought exactly one reload
+ * with the banner back up afterwards, twice in a row, so in such a browser a
+ * grant can never be made to stick. With the guard that is 0 reloads, and every
+ * lapse case still closes, because a record that is no longer accepted is still
+ * a record — measured at 1 reload with the cookies cleared in the same task as
+ * the event, for a record aged past the limit, for one under a bumped version,
+ * and for a `denied` this document never saw being written.
+ *
+ * The guard costs exactly one state: a store emptied outright —
+ * `localStorage.clear()`, or a `removeItem` on the key — under a document with
+ * Clarity running. The unguarded handler reloads there and this one does not
+ * (measured). Nothing this site offers reaches it: "Decline" and the withdraw
+ * button on /privacy/ both write a `denied` record, and a record is what the
+ * guard asks for. It takes devtools or the browser's own "clear site data", the
+ * `storage` listener above already covers it for every document that is not
+ * frozen, and ConsentBanner reads that state as "the question stands" rather
+ * than as a refusal — which is the same reading as leaving the document alone.
  *
  * A withdrawal therefore reloads the other tab: the injected script tag cannot
  * be unloaded, so a fresh document is the only thing that reliably stops it.
@@ -431,6 +505,37 @@ export function watchOtherTabs() {
     // The return value is ignored because nothing follows it; see
     // `enforceDecision` on why any caller with work left must not.
     if (event.persisted) enforceDecision(readDecision());
+  });
+
+  // On `document`, not `window`: `visibilitychange` is specified to fire at the
+  // Document, and it does not bubble past it.
+  document.addEventListener('visibilitychange', () => {
+    // Fires in both directions. Going away is nobody's business here — a
+    // document on its way into the background has nothing to re-read, and
+    // measured, the hidden half costs no reload in any decision state.
+    //
+    // `document.hidden` rather than a comparison against the `visibilityState`
+    // string, for two unrelated reasons that point the same way. It is
+    // fail-closed: the property is true for any state that is not the
+    // foreground one, so a state this code does not know about — `prerender`,
+    // which the spec dropped but not every engine did — is treated as "not now"
+    // instead of falling through a negated equality test. And naming the
+    // foreground state in here costs a dead CSS rule: that name is also a
+    // Tailwind utility — the one that resets `visibility` — no markup in this
+    // project uses it, and Tailwind scans this file for class candidates. First
+    // written with the string, it put a 28-byte rule for that class into every
+    // page's stylesheet; dropping the string made the sheet byte-identical to
+    // the one before this change. The note in the `CONSENT_VERSION` block says
+    // the same thing about prose: the scan does not care which it is, so the
+    // name is kept out of both, this comment included.
+    if (document.hidden) return;
+    // Not `readDecision() !== null`: that would also fire for an empty store,
+    // which is the one state this listener must stay out of. See
+    // `hasStoredRecord` and the section above.
+    if (!hasStoredRecord()) return;
+    // The return value is ignored because nothing follows it; see
+    // `enforceDecision` on why any caller with work left must not.
+    enforceDecision(readDecision());
   });
 }
 
