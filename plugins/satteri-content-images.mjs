@@ -115,8 +115,13 @@ export function webpCanvasSize(path) {
 const sizeCache = new Map();
 
 // Resolution lives here and only here, so the gate cannot compute it a second, slightly
-// different way (CLAUDE.md, rule 9 in the small). PUBLIC_DIR is only a default: the gate
-// passes Astro's resolved `config.publicDir`, which is what actually governs the build.
+// different way (CLAUDE.md, rule 9 in the small). The two call sites share this code but not
+// their base: the attributes that actually ship come from the visitor below, which calls this
+// without a second argument and therefore on the hardcoded PUBLIC_DIR; the gate passes Astro's
+// resolved `config.publicDir`, which governs the gate's comparison and nothing else. Today the
+// two are the same directory because astro.config.mjs sets no `publicDir`, and if they ever
+// diverged the gate would report a mismatch — fail-closed, and the signal to plumb the resolved
+// directory into this plugin as well.
 export function canvasSizeFor(src, publicDir = PUBLIC_DIR) {
   // src is site-root-relative, so it maps onto public/ one-to-one. The leading slash has to
   // go, or the URL constructor would resolve it against the filesystem root instead of
@@ -138,6 +143,15 @@ export default {
       // file here to measure, and emitting only the lazy half is the combination this plugin
       // exists to avoid. No such image exists in src/content today — this branch is what
       // keeps one from slipping through half-done.
+      //
+      // The case actually reachable from markdown is not the remote one but a path relative to
+      // the .md: instrumented, the visitor sees `src=./colocated.webp` with loading, width and
+      // height all undefined, because Astro resolves its own images *after* the hast pipeline.
+      // Returning is also the right answer there, and for a better reason — that pipeline then
+      // emits a hashed path with loading="lazy", decoding="async" and both dimensions already
+      // set, i.e. it does this plugin's job and a little more. So this is at once the answer to
+      // "why does this plugin not handle relative paths" and the cause of the hashed-path
+      // branch in the gate.
       if (typeof src !== 'string' || !src.startsWith('/')) return;
 
       // An author-set attribute wins. Both guards below are unreachable from a .md today, and
