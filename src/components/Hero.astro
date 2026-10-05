@@ -62,12 +62,14 @@ const aiSecondary = ['Paperclip', 'MCP', 'vLLM', 'Ollama', 'Hugging Face', 'RAG'
       <span class="font-mono text-xs text-stone-700 tracking-[0.01em]">
         Available for projects<span class="hidden sm:inline"> &amp; freelance work</span>
       </span>
-      {/* orange-600 on purpose, and the last place on the site that still
-          hovers to it: PRI-137 moved every text link to orange-700 because
-          orange-600 is about 3.6:1 on white and fails SC 1.4.3's 4.5:1. This
-          glyph is rendered text but `aria-hidden`, so it is pure decoration —
-          1.4.3 does not reach it, 1.4.11's 3:1 does, and 3.6:1 clears that.
-          Darkening it would only weaken the hover step for no gain. */}
+      {/* orange-600 on purpose, and the only place on the site where rendered
+          text still hovers to it: PRI-137 moved every text link to orange-700
+          because orange-600 is about 3.6:1 on white and fails SC 1.4.3's
+          4.5:1. This glyph is rendered text but `aria-hidden`, so it is pure
+          decoration — 1.4.3 does not reach it, 1.4.11's 3:1 does, and 3.6:1
+          clears that. Darkening it would only weaken the hover step for no
+          gain. The two icon links below hover to orange-600 as well, but they
+          hold no text node at all — see the comment there. */}
       <span
         aria-hidden="true"
         class="text-stone-500 group-hover:text-orange-600 group-focus-visible:text-orange-600 group-hover:translate-x-0.5 group-focus-visible:translate-x-0.5 transition-[color,transform,translate]"
