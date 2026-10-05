@@ -329,7 +329,16 @@ const projectJsonLd = {
       if (section.getBoundingClientRect().top - 110 <= 0) current = section.id;
     }
     tocLinks.forEach((link) => {
-      link.classList.toggle('toc-active', link.dataset.tocLink === current);
+      const isCurrent = link.dataset.tocLink === current;
+      link.classList.toggle('toc-active', isCurrent);
+      // The class only carries colour and the left rule, so the spy's one piece of
+      // information never reaches a screen reader without this. "location" is the
+      // aria-current token for the current position inside a set of sections.
+      if (isCurrent) {
+        link.setAttribute('aria-current', 'location');
+      } else {
+        link.removeAttribute('aria-current');
+      }
     });
   }
 
