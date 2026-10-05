@@ -73,7 +73,11 @@ src/pages/projects/[slug].astro  Projekt-Detailseite: getStaticPaths über die C
                               Prev/Next, Lesezeit, Scroll-Spy-TOC, SoftwareApplication-JSON-LD
 src/pages/legal.astro         Impressum
 src/pages/privacy.astro       Datenschutzerklärung
-src/components/               Hero, CareerTimeline, ExperienceCard, ProjectCard, Navigation, Footer
+src/components/               Hero, CareerTimeline, ExperienceCard, ProjectCard, Navigation, Footer,
+                              ConsentBanner
+src/scripts/consent.js        Consent-Gate für Clarity: Projekt-ID, Clarity.init und der dynamische
+                              Import, der vor dem Opt-in nicht ausgeführt wird. Von ConsentBanner
+                              angesteuert; `@microsoft/clarity` wird nur hier importiert
 src/scripts/reveal.js         Staggered Scroll-Reveal (respektiert prefers-reduced-motion)
 src/styles/global.css         Tailwind-Layer, Basis-Styles, Skip-Link, Reveal-Styles
 ```
