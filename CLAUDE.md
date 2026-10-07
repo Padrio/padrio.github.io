@@ -23,51 +23,112 @@ Diese Datei wird automatisch gelesen und ist die maßgebliche Quelle für Projek
 | Icons | `astro-icon` 1.2 mit `@iconify-json/simple-icons` |
 | SEO | `@astrojs/sitemap` |
 | Fonts | `@fontsource/inter` und `@fontsource/jetbrains-mono` — selbst gehostet, keine externen Requests |
-| Analytics | Microsoft Clarity (`@microsoft/clarity`), Projekt-ID in `src/layouts/Layout.astro` |
+| Analytics | Microsoft Clarity (`@microsoft/clarity`), Projekt-ID (`CLARITY_PROJECT_ID`) und `Clarity.init` in `src/scripts/consent.js` — seit [PRI-123](/PRI/issues/PRI-123) hinter dem Consent-Gate, geladen erst nach dem Opt-in. In `src/layouts/Layout.astro` steht dazu nur ein Kommentar, der festhält, warum dort kein Clarity-Code stehen darf. |
 
 ### Befehle
 
 ```bash
 npm ci        # Dependencies installieren (reproduzierbar, nutzt package-lock.json)
 npm run dev   # Dev-Server auf http://localhost:4321
-npm run build # Statischer Build nach dist/ — eines der beiden Qualitätsgates
+npm run build # Statischer Build nach dist/ — Qualitätsgate; enthält zusätzlich das Bild-Gate (s. u.)
 npm run preview # Build lokal ausliefern
 ```
 
-Es gibt **keine Tests und keinen Linter**. Automatisch geprüft wird an genau zwei Stellen, beide in
-`.github/workflows/pr-build.yml`: `npm run build`, und davor ein Grep-Gate, das Tailwind-3-Idiome in
-`src/` ablehnt (`shadow-sm`, `theme(`, `*-opacity-*`, nacktes `ring`, …). Die vollständige Liste
-steht samt Begründung und der richtigen Ersetzung als Kommentar direkt bei der Liste im Workflow.
-Grund für das zweite Gate ist [PRI-80](/PRI/issues/PRI-80): eine Klasse, die unter Tailwind 4 nur noch semantisch falsch
+Es gibt **keine Tests und keinen Linter**. Automatisch geprüft wird an genau drei Stellen, und nur
+zwei davon liegen in `.github/workflows/pr-build.yml`: `npm run build`, und davor ein Grep-Gate, das
+Tailwind-3-Idiome in `src/` ablehnt (`shadow-sm`, `theme(`, `*-opacity-*`, nacktes `ring`, …). Die
+vollständige Liste steht samt Begründung und der richtigen Ersetzung als Kommentar direkt bei der
+Liste im Workflow. Grund für das zweite Gate ist [PRI-80](/PRI/issues/PRI-80): eine Klasse, die unter Tailwind 4 nur noch semantisch falsch
 ist, baut grün durch — ohne Linter meldet das sonst nichts.
+
+**Das dritte Gate steht in keinem Workflow, sondern in `npm run build` selbst.** Es steht hier, damit
+du es findest, *bevor* es dich rot macht:
+
+- **Wo:** `plugins/assert-content-images.mjs`, eingehängt als Astro-Integration `assertContentImages()`
+  in `astro.config.mjs` — nicht in `.github/workflows/`, dort steht dazu nichts.
+- **Wann:** im Hook `astro:build:done`, also bei **jedem** `npm run build` — lokal genauso wie im
+  `pr-build`-Lauf. Es ist **kein Workflow-Schritt**: wer es in `pr-build.yml` sucht, findet es nicht,
+  und ein grüner Build ohne diese Zeile im Log gibt es nicht.
+- **Was:** das gebaute `dist/` gegen `src/content/projects/*.md`. Jedes Bild, das das Markdown eines
+  Projekts referenziert, muss in der erzeugten Seite stehen **und** `loading="lazy"` plus die
+  `width`/`height` aus dem WebP-Header der Datei tragen; das Hero-Bild aus dem Frontmatter muss
+  umgekehrt **ohne** `loading`-Attribut gerendert sein (es liegt above the fold und bleibt eager).
+  Nicht gemessen werden entfernte (`https:`, `//host`) und ko-lokalisierte Bilder, die Astros eigene
+  Asset-Pipeline übernimmt — ihre Anwesenheit wird geprüft, ihre Attribute nicht.
+- **Grün** ist eine `logger.info`-Zeile im Build-Log, heute mit acht Bildern:
+  `[assert-content-images] 8 markdown image(s) carry loading="lazy" and their file's width/height; every hero is eager`
+  (um `; N image(s) present but not measured …` ergänzt, sobald es ein nicht gemessenes Bild gibt).
+- **Rot** ist ein `throw` mit der Problemliste — `[assert-content-images] N problem(s):` und darunter
+  eine Zeile pro Problem, die in der Regel Slug und `src` benennt — und damit Exit 1 für den Build.
+  Daneben steht ein zweiter `throw` anderer Form, `[assert-content-images] no .md files under <dir>`,
+  für den Fall, dass das Gate gar kein Projekt-Markdown findet; mit fünf Dateien ist er heute
+  unerreichbar.
+
+Getroffen wird davon, wer ein Markdown-Bild anfasst, ein Projekt-Markdown anlegt oder eine Bilddatei
+austauscht; der Grund für jede einzelne Entscheidung darin steht ausführlich im Kopf der Datei, und
+das Verhalten ist in [PRI-285](/PRI/issues/PRI-285) in vier Runden reviewt. **Eine Lücke nennt die
+Datei selbst:** ein handgeschriebenes `<img>` direkt im Markdown erreicht weder das hast-Plugin noch
+den Scanner dieses Gates und geht unbemerkt durch — bewusst so, weil die Pipeline ein solches Tag
+nicht korrigieren kann.
 
 ---
 
 ## Struktur
 
 ```
-astro.config.mjs              site, Integrationen (icon, sitemap), Tailwind als Vite-Plugin, Redirects (Meta-Refresh, s. Regel 10)
+astro.config.mjs              site, drei Integrationen (icon, sitemap, assertContentImages — das
+                              dritte Gate aus plugins/, s. Abschnitt Befehle), markdown.processor
+                              (satteri mit dem hast-Plugin aus plugins/), Tailwind als Vite-Plugin,
+                              Redirects (Meta-Refresh, s. Regel 10)
 tailwind.config.mjs           Tailwind-Theme (u. a. max-w-content); `content` ist unter Tailwind 4 wirkungslos
 .cursorrules                  Design-System „Warm Minimalist" im Detail (Quelle für Regel 4)
 .github/workflows/deploy.yml  GitHub-Pages-Deploy (Push auf main + workflow_dispatch)
 .github/workflows/pr-build.yml  PR-Gate bei jedem PR gegen main (required status check): erst ein
                               Grep-Gate gegen Tailwind-3-Idiome in src/, dann npm ci + npm run build
+plugins/satteri-content-images.mjs  Sätteri-hast-Plugin: setzt an jedem <img> mit einem /…-Pfad aus
+                              public/, das das Markdown eines Projekts rendert, loading="lazy" und
+                              die width/height aus dem WebP-Header der Datei. Entfernte (https:,
+                              //host) und ko-lokalisierte Bilder lässt es unberührt, die gehören
+                              Astros Asset-Pipeline; hängt an markdown.processor in astro.config.mjs
+plugins/assert-content-images.mjs  Das dritte automatische Gate (Abschnitt Befehle): prüft in
+                              astro:build:done das gebaute dist/ gegen src/content/projects/*.md und
+                              macht npm run build rot, wenn ein Markdown-Bild die Attribute nicht
+                              trägt oder ein Hero-Bild lazy geworden ist. Liegt bewusst hier und
+                              nicht im Plugin: ein throw im Markdown-Render endet mit Exit 0,
+                              einer in astro:build:done mit 1 (Regel 3)
 public/CNAME                  Custom Domain pkrason.de
 public/favicon.svg
+public/robots.txt             User-agent: * / Allow: / plus Sitemap-Verweis auf
+                              https://pkrason.de/sitemap-index.xml (den @astrojs/sitemap erzeugt)
+public/images/**              Bilder ausschließlich als WebP (Regel 6), mit genau einer Ausnahme —
+                              siehe den Eintrag og-image.png unten
 public/images/profile.webp    Profilfoto im Hero, 264x264 (2x für die 132-px-Darstellung)
-public/images/og-image.png    Default-OG-Bild, 1200x630
-public/images/projects/*.webp Projekt-Screenshots — ausschließlich WebP
+public/images/og-image.png    Default-OG-Bild, 1200x630 — die Ausnahme von Regel 6 (PNG, weil
+                              Social-Plattformen WebP-Vorschauen unterschiedlich unterstützen)
+public/images/projects/*.webp Projekt-Screenshots
 
 src/content.config.ts         Schema der Content Collection "projects" (Zod, Content Layer API)
 src/content/projects/*.md     Ein Markdown-File pro Projekt, Frontmatter nach obigem Schema
 src/layouts/Layout.astro      HTML-Grundgerüst: Meta-/OG-/Twitter-Tags, Person-JSON-LD,
-                              Fonts, Clarity-Init, Skip-Link, Navigation, Footer, reveal.js
+                              Fonts, Skip-Link, Navigation, Footer, <ConsentBanner />, reveal.js.
+                              Im Markup steht bewusst kein Clarity-Code: ein statischer Import
+                              oder ein Preconnect, der schon beim Parsen des <head> feuert, wäre
+                              ein Kontakt vor der Einwilligung. Im <head> steht dazu nur ein
+                              {/* … */}-Kommentar, der genau das festhält; Projekt-ID und Init
+                              liegen in src/scripts/consent.js
 src/pages/index.astro         Startseite: Hero, CareerTimeline, "Selected Works", Kontakt-Strip
 src/pages/projects/[slug].astro  Projekt-Detailseite: getStaticPaths über die Collection,
                               Prev/Next, Lesezeit, Scroll-Spy-TOC, SoftwareApplication-JSON-LD
 src/pages/legal.astro         Impressum
 src/pages/privacy.astro       Datenschutzerklärung
-src/components/               Hero, CareerTimeline, ExperienceCard, ProjectCard, Navigation, Footer
+src/components/               Hero, CareerTimeline, ExperienceCard, ProjectCard, Navigation, Footer,
+                              ConsentBanner
+src/scripts/consent.js        Consent-Gate für Clarity: Projekt-ID, Clarity.init und der dynamische
+                              Import, der vor dem Opt-in nicht ausgeführt wird. Importiert von
+                              ConsentBanner und von src/pages/privacy.astro (dort hängen der
+                              Widerrufs-Button und die Status-Zeile daran) — beide Pfade gehören
+                              zum Blast Radius jeder Änderung hier (Regel 9);
+                              `@microsoft/clarity` wird nur hier importiert
 src/scripts/reveal.js         Staggered Scroll-Reveal (respektiert prefers-reduced-motion)
 src/styles/global.css         Tailwind-Layer, Basis-Styles, Skip-Link, Reveal-Styles
 ```
@@ -101,15 +162,22 @@ Die Detailseite wird für **jedes** Projekt erzeugt, unabhängig von `featured`.
    **Präzisierung für Stacks, vom Board am 2026-10-02 freigegeben ([PRI-155](/PRI/issues/PRI-155)):** Ein Agent darf einen vollständig reviewten Kind-PR in einen `stack/**`-Branch mergen — und nur dorthin. Direkte Commits auf `stack/**` sind verboten. Alles übrige an Regel 1 bleibt unverändert. Das Verfahren steht im Abschnitt **Stacked Pull-Requests**; dies ist wie der Self-Merge eine Präzisierung von Regel 1 und keine neue Regel — die Nummerierung bleibt bei 14.
 2. **Git-Identität:** Der **Commit-Author** ist „Pascal Krason <p.krason@icloud.com>" und wird verbindlich per `git commit --author="Pascal Krason <p.krason@icloud.com>"` gesetzt. Der **Committer** ist die Laufzeit-Identität des Workspace und wird nicht umgangen — insbesondere nicht durch einen direkten Aufruf von `/usr/bin/git`, mit dem ein Agent eine Laufzeitkontrolle über die Commit-Attribution unterlaufen würde. **Keine `Co-Authored-By`-Zeilen** in Commits oder PR-Beschreibungen — weder Claude noch Paperclip. Claude Code fügt sie standardmäßig hinzu; prüfe jede Commit-Message und jeden PR-Body, bevor du ihn abschickst.
    *Die Regel bindet den Branch-Commit. Was beim Merge auf `main` aus dem Author wird, entscheidet GitHub — siehe **Runtime-Realität**, „Der Commit-Author liegt beim Agent, der Committer nicht".*
-3. **Vor jedem PR muss `npm run build` fehlerfrei durchlaufen.** Das Ergebnis wird im zugehörigen Issue dokumentiert. Es gibt weder Tests noch Linter — der Build ist das eine von zwei Qualitätsgates; das zweite ist das Grep-Gate gegen Tailwind-3-Idiome, das im selben Workflow **vor** `npm ci` läuft (Abschnitt *Befehle*). Seit dem 2026-09-30 ist diese Regel zusätzlich technisch erzwungen: der Status-Check `pr-build` ist auf dem Default-Branch per Ruleset Pflicht, ein PR mit rotem oder fehlendem `pr-build` ist nicht mergebar (siehe **Runtime-Realität**, „`main` ist per Ruleset geschützt").
+3. **Vor jedem PR muss `npm run build` fehlerfrei durchlaufen.** Das Ergebnis wird im zugehörigen Issue dokumentiert. Es gibt weder Tests noch Linter — der Build ist eines von drei Qualitätsgates; das zweite ist das Grep-Gate gegen Tailwind-3-Idiome, das im selben Workflow **vor** `npm ci` läuft, das dritte das Bild-Gate `plugins/assert-content-images.mjs`, das *innerhalb* von `npm run build` feuert und deshalb auch lokal (beide im Abschnitt *Befehle*). Seit dem 2026-09-30 ist diese Regel zusätzlich technisch erzwungen: der Status-Check `pr-build` ist auf dem Default-Branch per Ruleset Pflicht, ein PR mit rotem oder fehlendem `pr-build` ist nicht mergebar (siehe **Runtime-Realität**, „`main` ist per Ruleset geschützt").
    **Seit dem 2026-10-02 gilt das Gate zusätzlich gegen den aktuellen Stand von `main`** (Board-Entscheidung auf [PRI-108](/PRI/issues/PRI-108)): im Ruleset `main: pr-build required` steht jetzt `strict_required_status_checks_policy: true`, Required-Check unverändert `pr-build`, `bypass_actors: []`. Ein grünes `pr-build` heißt damit „grün gegen den **aktuellen** `main`" und nicht mehr „grün gegen die Branch-Basis von damals" — in [PRI-80](/PRI/issues/PRI-80) zählte deshalb für PR #13 ein `pr-build`, das am 2026-09-30 gegen die Basis vor der Tailwind-4-Migration grün geworden war und 15 Stunden später mitgemerged wurde. **Der Schalter allein hätte PR #13 aber nicht gestoppt:** er hätte den Branch nur neu gebaut, und `shadow-sm` kompiliert unter Tailwind 4 anstandslos — es bedeutet dort nur den alten `shadow`. Was diese Klasse Regression wirklich sieht, ist das Grep-Gate, das [PRI-80](/PRI/issues/PRI-80) als Abhilfe gebracht hat. Beide Gates greifen erst zusammen. Der Preis: ist `main` weitergelaufen, seit dein Branch abgezweigt oder zuletzt nachgezogen wurde, blockiert GitHub den Merge, bis der Branch nachgezogen ist. Das ist **kein Fehler und kein Blocker**, sondern der Normalfall, sobald ein anderer Autor seinen PR merged, während deiner offen ist. Nachziehen (Rebase oder „Update branch") und den neuen `pr-build`-Lauf abwarten ist Aufgabe des PR-Autors — siehe **Arbeitsablauf**, Schritt 5.
    *Trotzdem bleibt der lokale Build Pflicht, und grünes `pr-build` ist kein Korrektheitsbeweis: der Build kompiliert nur, was tatsächlich erreicht wird. Toter Code kommt grün durch — ein Import auf eine nicht existierende Datei fällt nicht auf, solange das importierende Modul nirgends gerendert wird. Lies aus dem Gate also nie „CI prüft das schon"; was der Build nicht abdeckt, musst du selbst prüfen.*
-4. **Design-System „Warm Minimalist"** (siehe `.cursorrules`): kein Dark Mode, keine Tech-/Cyberpunk-Ästhetik, kein Glassmorphism/`backdrop-blur`. Basis `stone-50`, weiße Karten mit dezenten Schatten, Akzent orange/rose. Mobile first. Bewusste A11y-Entscheidungen beibehalten: kleine Texte mindestens `stone-500` (nicht `stone-400`), Nav-CTA `orange-700`.
+   **Die gravierendste bekannte Ausprägung davon geht über toten Code hinaus: ein `throw` während des Markdown-Renderings liefert eine ausgeweidete Seite statt eines roten Builds.** Astros glob-loader fängt den `throw`, loggt `[ERROR] [glob-loader] Error rendering <datei>.md` — und der Build endet trotzdem mit **Exit 0**. Ausgeliefert wird eine Projektseite mit **leerem** `.prose-project`. Ein `throw` in `astro:build:done` beendet den Build dagegen mit 1. Zum Stand von [PRI-126](/PRI/issues/PRI-126) sahen das beide Workflow-Gates nicht: `npm run build` war grün, und das Grep-Gate gegen Tailwind-3-Idiome sieht Markdown-Rendering ohnehin nicht. Gemessen beim Bau von [PRI-126](/PRI/issues/PRI-126), unabhängig reproduziert vom Code Auditor in [PRI-278](/PRI/issues/PRI-278) und vom QA Auditor in [PRI-279](/PRI/issues/PRI-279): mit dem Markdown-Plugin aus PRI-126 fiel `/projects/konteo-provision/` von 26.416 auf 16.547 Byte, auf der ganzen Seite blieb ein einziger `<img>` übrig — das Hero-Bild aus `src/pages/projects/[slug].astro`, das außerhalb von `.prose-project` liegt (alle drei Messungen 16.547 Byte). **Diese Zahlen gelten für diese eine Seite, dieses eine Plugin und den Template-Stand von PRI-126** — nicht auf andere Projektseiten übertragen. Die Fehlerklasse hängt nicht an dem Plugin, sondern am glob-loader. **Der Vorbehalt „auf dem heutigen `main`", unter dem dieser Absatz in [PRI-282](/PRI/issues/PRI-282) geschrieben wurde, ist mit dem Merge von Stack 1 eingelöst** ([PRI-160](/PRI/issues/PRI-160), PR [#65](https://github.com/Padrio/padrio.github.io/pull/65)): `main` hat seitdem beides, was der Absatz dort verneinte — ein Markdown-Plugin (`plugins/satteri-content-images.mjs`) und ein Gate dagegen (`plugins/assert-content-images.mjs`, Abschnitt *Befehle*). Das Gate nimmt genau den Weg, den der Absatz als den wirksamen nennt: es prüft nicht den Render, sondern das gebaute `dist/`, und wirft in `astro:build:done`. **Es deckt die Fehlerklasse aber nur so weit, wie sie die Projekt-Bilder betrifft** — rot wird eine ausgeweidete `.prose-project` nur, wenn das Markdown dieses Projekts überhaupt ein Bild referenziert, heute `konteo-panel.md` (6) und `konteo-provision.md` (2), zusammen die acht aus der grünen Gate-Zeile. Die drei übrigen Projekt-Markdowns tragen nur das Frontmatter-Hero, das `src/pages/projects/[slug].astro` außerhalb von `.prose-project` rendert und das die Ausweidung deshalb überlebt — ihre Ausweidung kommt weiter mit Exit 0 durch (vom Code Auditor in [PRI-292](/PRI/issues/PRI-292) an `amazon-autocode.md` gemessen, mit `konteo-provision.md` als rotem Kontrolllauf). Ebenso durch kommt ein `throw` an einer Stelle, die kein Markdown-Bild berührt. Die Lücke am glob-loader selbst ist nicht geschlossen, und wer sie schließen will, ist ein eigenes Issue; hier steht nur, was gemessen ist.
+4. **Design-System „Warm Minimalist"** (siehe `.cursorrules`): kein Dark Mode, keine Tech-/Cyberpunk-Ästhetik, kein Glassmorphism/`backdrop-blur`. Basis `stone-50`, weiße Karten mit dezenten Schatten, Akzent orange/rose. Mobile first. Bewusste A11y-Entscheidungen beibehalten: kleine Texte **auf hellem Grund** mindestens `stone-500` (nicht `stone-400`), Nav-CTA `orange-700`.
+   **Geltungsbereich der `stone-500`-Vorgabe: heller Grund.** Sie ist eine Kontrastvorgabe, keine Farbvorliebe. Auf `bg-stone-50` misst `stone-500` 4,58:1 und besteht AA knapp, `stone-400` nur 2,48:1 und fällt durch — daher die Vorgabe. Auf dunklem Grund kippt das Vorzeichen, und dort gilt: **der kontraststärkere Wert gewinnt**, auch wenn er heller ist als `stone-500`. Beispiel ist der Untertitel im Kontakt-Strip von `src/pages/index.astro` (`text-[17px] text-stone-400` auf `bg-stone-900`; greppbar als der Absatz unter `// Let's talk` im Block `id="contact"`): gemessen **6,76:1, AA bestanden**; `stone-500` käme an derselben Stelle auf **3,65:1** und würde AA brechen. Die Vorgabe wörtlich auf eine dunkle Sektion anzuwenden verschlechtert also genau das, was sie schützen soll — nicht tun. Entschieden vom Board am 2026-10-03 auf [PRI-140](/PRI/issues/PRI-140): der Regeltext wird präzisiert, der Code bleibt.
+   **Die Untergrenze ist in beiden Zweigen dieselbe: 4,5:1 (WCAG AA, 1.4.3)** für kleinen Text, unabhängig von der Helligkeit des Grundes. „Der kontraststärkere Wert gewinnt" entscheidet nur zwischen Kandidaten, die AA bereits bestehen — der Komparativ ersetzt die Schwelle nicht. Sonst berät die Regel korrekt in ein AA-Versagen hinein: auf `bg-stone-800` misst `stone-500` 3,17:1 und `stone-600` 1,99:1, der Komparativ wählt also `stone-500` und bleibt trotzdem unter der Schwelle, weil **beide** Kandidaten darunter liegen (richtig wäre dort `stone-400` mit 5,87:1). Wer eine neue dunkle Fläche einführt, rechnet den Wert also nach und wählt nicht nur den besseren von zwei.
+   *Die Werte sind am 2026-10-04 gegen das gebaute Stylesheet gemessen (Chromium headless, `getComputedStyle` plus Canvas-Rasterisierung — nötig, weil Tailwind 4 die Palette als `oklch()` ausliefert und der berechnete Wert `oklch()` bleibt) und am 2026-10-05 auf einem zweiten Weg bestätigt (`oklch`→sRGB direkt aus `node_modules/tailwindcss/theme.css` gerechnet, 8-Bit-quantisiert). **Rechne nach dem Quantisieren auf 8 Bit** (das ist, was ein Browser tatsächlich rastert), nicht auf den `oklch`-Fließkommawerten: ohne Quantisierung ergibt dieselbe Rechnung 4,61 / 2,48 / 6,76 / 3,64, also bei zwei der vier Werte eine Abweichung in der zweiten Dezimalstelle. Das Board nannte für `stone-400` auf `bg-stone-900` 6,93:1; das ist der Wert der Tailwind-3-Palette (`#a8a29e`). Seit der Tailwind-4-Migration liefert dieselbe Klasse `oklch(0.709 0.01 56.259)` = `#a6a09b`, also 6,76:1 — `stone-900` ist in beiden Paletten `#1c1917`, verschoben hat sich nur `stone-400`. Das Verdikt ändert sich dadurch nicht, die Zahl schon: wer hier nachmisst, vergleicht mit 6,76 und nicht mit 6,93.*
    **Touch-Targets:** Eigenständige Steuerelemente — Buttons, CTAs, Navigations- und Footer-Links, Karten- und Sidebar-Links — haben mindestens 44 px effektive Trefffläche in beiden Achsen. Ausgenommen sind Links im Fließtext (heute die Wrapper `.prose` und `.prose-project`), Einträge dichter Listen-Navigationen (Scroll-Spy-TOC) und der Skip-Link als reines Tastaturziel. Für **jedes** interaktive Element gilt ein Unterboden von 24 px (WCAG 2.2 AA, 2.5.8) — mit derselben Inline-Ausnahme, die 2.5.8 selbst für Links im Satzfluss kennt.
    *Herkunft, damit niemand die Ausnahmen für eine Verwässerung hält: 44 px ist WCAG 2.5.5 **AAA** — die strengere Stufe, die diese Site freiwillig hält. Der Unterboden von 24 px ist der verbindliche AA-Wert aus WCAG 2.2, 2.5.8, und die Ausnahme für Inline-Links steht so in 2.5.8. Die Ausnahmeliste markiert also die Grenze zwischen dem freiwilligen AAA-Ziel und dem Pflicht-AA-Wert, nicht eine Absenkung des Anspruchs. Entschieden vom Board am 2026-10-01 auf [PRI-85](/PRI/issues/PRI-85), im Code umgesetzt mit [PRI-110](/PRI/issues/PRI-110).*
    *Zwei Präzisierungen stammen nicht aus dem Board-Wortlaut, sondern sind beim Nachführen ergänzt und in [PR #30](https://github.com/Padrio/padrio.github.io/pull/30) begründet: die Board-Fassung formulierte den 24-px-Unterboden **ausnahmslos** (die Inline-Ausnahme ist aus 2.5.8 nachgetragen) und nannte als Fließtext-Wrapper nur `.prose` (`.prose-project` ist ergänzt, weil Klassenselektoren exakte Tokens matchen und `.prose` die Projekt-Detailseite nicht trifft). Die Wrapper-Liste ist eine Momentaufnahme des Ist-Stands, keine abschließende Definition — wer sie in ein Gate übersetzt, verifiziert sie am Code und schreibt sie nicht ab. Die inhaltsgleiche englische Fassung steht in `.cursorrules` Zeile 32; Änderungen hier dort mitziehen (das entscheidet die Präzedenzfrage nicht, siehe Ende des nächsten Abschnitts).*
 5. **Icons nur über `astro-icon`** (`<Icon name="simple-icons:…" />`). Niemals SVG-Pfade von Hand schreiben.
-6. **Bilder nur als WebP** unter `public/images/projects/` (`cwebp -q 80`). Keine PNG-/JPG-Duplikate committen.
+6. **Bilder nur als WebP** — unter **ganz** `public/images/`, nicht nur unter `public/images/projects/`. Qualitätsziel rund q80. Keine PNG-/JPG-Duplikate committen.
+   *Warum die Ausweitung: die alte Fassung nannte nur `public/images/projects/`. Das Profilfoto lag eine Ebene darüber und fiel damit formal nicht unter die Regel — eine Lücke, nicht eine Absicht. Mit [PRI-125](/PRI/issues/PRI-125) ist aus `profile.jpg` ein `profile.webp` geworden; die Regel zieht hier nach, damit die nächste Datei auf dieser Ebene nicht dieselbe Lücke nutzt.*
+   **Eine Ausnahme, ausdrücklich: das OG-/Social-Vorschaubild** (`public/images/og-image.png`). Es liegt nach der Bildentscheidung in [PRI-125](/PRI/issues/PRI-125) als PNG vor, weil Social-Plattformen WebP-Vorschauen unterschiedlich gut unterstützen. Die Ausnahme gilt für dieses eine Bild in seiner Rolle als Vorschaubild — sie ist kein Freibrief für PNG oder JPG an anderer Stelle unter `public/images/`.
+   **Zum Werkzeug — die Regel nennt absichtlich keines.** `cwebp` ist im Agent-Workspace **nicht** installiert, ebenso nicht `convert`, `magick`, `gm` oder `ffmpeg` (geprüft 2026-10-04). Die frühere Fassung schrieb `cwebp -q 80` vor und verlangte damit ein Werkzeug, das kein Agent hat; verbindlich ist deshalb das Qualitätsziel (rund q80), nicht der Aufruf. Was tatsächlich geht: `sharp` liegt in `node_modules` (0.35.5) und kodiert WebP — `sharp(input).webp({ quality: 80 })` in einem Wegwerf-Node-Skript genügt. Zwei Einschränkungen dazu: `sharp` steht nicht in `package.json`, sondern kommt als **`optionalDependencies` von `astro`** (`^0.35.4`) herein — es ist also vorhanden, aber nicht zugesagt, und darf nach Regel 8 nicht **ohne Board-Freigabe** zu einer eigenen Dependency gemacht werden (Regel 8 ist ein Freigabevorbehalt, kein Verbot — lies hier also keinen versperrten Weg); und wer ein anderes Werkzeug benutzt, erfüllt die Regel genauso, solange das Ergebnis WebP in dieser Qualitätsgrößenordnung ist.
 7. **Rechtliches:** `src/pages/legal.astro` und `src/pages/privacy.astro` nur mit ausdrücklicher Board-Freigabe ändern. Neue Third-Party-Skripte, Tracker, externe CDN-Fonts oder Embeds brauchen eine Board-Freigabe **und** eine passende Anpassung der Datenschutzerklärung (DSGVO).
 8. **Keine neuen Dependencies und keine Major-Upgrades** ohne Board-Freigabe.
 9. **Cross-Pfad-Konsistenz:** wo dieselben Daten an mehreren Stellen gerendert werden (ProjectCard auf der Startseite vs. Detailseite, Frontmatter vs. JSON-LD vs. OG-Tags), alle Pfade Feld für Feld vergleichen. Jede Abweichung muss begründet sein.
@@ -123,7 +191,7 @@ Die Detailseite wird für **jedes** Projekt erzeugt, unabhängig von `featured`.
 
 ## Bekannte Abweichungen zwischen Regel 4 / `.cursorrules` und dem Code auf `main`
 
-Diese drei Stellen widersprechen Regel 4 bzw. `.cursorrules`, liegen aber bereits ausgeliefert auf `main`.
+Diese zwei Stellen widersprechen Regel 4 bzw. `.cursorrules`, liegen aber bereits ausgeliefert auf `main`.
 **Sie sind offen und nicht entschieden.** Fasse sie nicht nebenbei an: eine Änderung wäre entweder das
 Entfernen einer bewussten Design-Entscheidung oder ein Bugfix ohne Auftrag — beides braucht nach Regel 12
 eine Board-Entscheidung. Steht in einem Issue ausdrücklich, dass eine dieser Stellen geändert werden soll,
@@ -132,8 +200,13 @@ gilt das Issue.
 | Stelle | Regel | Ist-Stand |
 |---|---|---|
 | `src/components/Navigation.astro:9` | Regel 4 / `.cursorrules` §2: kein Glassmorphism, kein `backdrop-blur` | Sticky-Nav nutzt `backdrop-blur-md backdrop-saturate-150` |
-| `src/pages/index.astro:68` | Regel 4: kleine Texte mindestens `stone-500` | `text-[17px] text-stone-400` — steht aber auf `bg-stone-900`, wo `stone-400` der kontraststärkere Wert ist. Die Regel ist erkennbar für hellen Grund gedacht, sagt das aber nicht. |
-| `src/pages/index.astro:63` (Kontakt-Strip), `src/styles/global.css:47` (Skip-Link) | Regel 4 / `.cursorrules` „Design Philosophy", Zeile 7 (`STRICT RULE: NO DARK MODE`) | Beide sind `bg-stone-900`. Lesart „kein umschaltbares Dark-Theme" vs. „keine dunkle Sektion" ist ungeklärt. |
+| `src/pages/index.astro:82` (Kontakt-Strip), `src/styles/global.css:47` (Skip-Link) | Regel 4 / `.cursorrules` „Design Philosophy", Zeile 7 (`STRICT RULE: NO DARK MODE`) | Beide sind `bg-stone-900`. Lesart „kein umschaltbares Dark-Theme" vs. „keine dunkle Sektion" ist ungeklärt. |
+
+**Eine dritte Zeile ist mit der Board-Entscheidung vom 2026-10-03 entfallen,** nicht gelöst durch eine
+Codeänderung: `text-stone-400` auf dem dunklen Kontakt-Strip. Mit der Präzisierung „auf hellem Grund" in
+Regel 4 ist das keine Abweichung mehr, sondern der von der Regel gewollte Fall. Wer die Stelle in einer
+älteren Fassung dieser Tabelle gesehen hat, findet die Begründung samt Messwerten jetzt bei Regel 4
+([PRI-140](/PRI/issues/PRI-140)).
 
 Zwei Detailabweichungen ohne Konfliktcharakter: `.cursorrules` nennt als Font „Inter/Geist" und kennt
 JetBrains Mono nicht, das im Theme als `font-mono` gesetzt ist; und es schreibt Buttons als warmen
@@ -183,6 +256,7 @@ Im Agent-Workspace verifiziert. Diese Punkte kosten sonst jeden Agent einen Fehl
   - **Die Committer-Zeile ist nicht setzbar.** Der Wrapper löscht `GIT_COMMITTER_*` aus der Kindprozess-Umgebung und belegt sie selbst. Umgehbar nur durch direkten Aufruf von `/usr/bin/git` — das ist ausdrücklich unerwünscht, weil ein Agent damit eine Laufzeitkontrolle über Commit-Attribution unterlaufen würde.
   - **Auf `main` überlebt der per `--author` gesetzte Author den Merge nicht.** Der Squash-Commit `d910a21` (aus `cb3262c`) und die Merge-Commits `277ad03`/`fd2ef58` tragen alle Author `Pascal Krason <3200139+Padrio@users.noreply.github.com>`: GitHub ersetzt beim Merge über UI/API den gesamten Author durch die Identität des mergenden Kontos — E-Mail ist dessen noreply-Adresse (E-Mail-Privacy), Name dessen Profilname. Dass der Name hier passt, liegt am Profilnamen des Kontos `Padrio` und nicht daran, dass der Branch-Commit ihn durchreicht; Nachweis: `ba92205` ist der Merge von `4950d29` (Author-Name `Padrio`) und trägt selbst den Author-Namen `Pascal Krason`. Regel 2 bindet also den **Branch-Commit**; was auf `main` landet, entscheidet GitHub. Nicht dagegen anarbeiten und die Differenz nicht als Fehler melden.
 - **Der Workspace kann parallel von mehreren Runs gehalten werden.** Nicht im gemeinsamen Checkout den Branch wechseln — mit `git worktree add` in einem eigenen Verzeichnis arbeiten und dort `npm ci` ausführen. `git rev-parse --abbrev-ref HEAD` darf nie `main` sein, während du arbeitest.
+- **Die Clarity-Projektkonfiguration liegt im Dashboard, nicht im Repo.** Der Tag `https://www.clarity.ms/tag/wu9fh588ka?ref=npm` liefert sie serverseitig aus — am 2026-10-03 in [PRI-186](/PRI/issues/PRI-186) gemessen als `{…,"upload":"https://a.clarity.ms/collect","expire":365,"cookies":["_uetmsclkid","_uetvid","_clck"],"track":false,"content":true,…}`. Sie kann sich **ohne Commit** ändern, und hier bekommt das nichts mit: kein Diff, kein Build-Fehler, nichts in der Konsole. Als Dashboard-Schalter belegt ist `track` (G4); für die übrigen Werte ist nur belegt, dass Microsoft sie serverseitig ausliefert — und `upload` ist nicht einmal der Host, der kontaktiert wird: den `/collect`-Shard wählt die Bibliothek zur Laufzeit (gemessen `l.`/`h.`/`f.`/`t.clarity.ms`, `a.clarity.ms` in keinem der vier Läufe). Dass vor dem Opt-in kein Byte von Clarity geladen wird, hängt seit [PRI-123](/PRI/issues/PRI-123) am Consent-Gate in `src/scripts/consent.js` und nicht mehr an `"track": false`; am Dashboard hängt der Zustand **nach** der Einwilligung, den `src/pages/privacy.astro` beschreibt (`_clck` 365 Tage, `_clsk` 1 Tag, `_cltk` in `sessionStorage`, keine Werbespeicherung — `_cltk` hängt nach PRI-186 selbst an `track`). Deshalb gilt operativ: **nach jeder Änderung an den Clarity-Projekteinstellungen C1/C2 neu messen und den Datenschutztext dagegen gegenlesen.** Messgrundlage ist die Prüfliste aus [PRI-186](/PRI/issues/PRI-186) — C1: kein Request an `*.clarity.ms` (jeder `/collect`-Shard eingeschlossen) und keiner an `c.bing.com`; C2: kein Cookie, leeres `sessionStorage`, in `localStorage` nur `pk-consent-analytics`; dazu C8/C9 für den Cookie-Satz nach der Einwilligung. Weicht der Text ab, ist seine Korrektur nach Regel 7 freigabepflichtig.
 - **Ein Headless-Chromium liegt im Agent-Image — Rendering ist messbar, nicht nur rechenbar.** Binaries, CDP-Client, Viewports, Messfallen und das Aufräumen stehen im eigenen Abschnitt **Rendering messen**.
 - **Beende nur Prozessbäume, die du selbst gestartet hast.** Eigene über die aufgezeichnete PID (Abschnitt *Rendering messen*, „Aufräumen"), fremde **melden statt reapen** — Sweep mit `ps -eo pid,ppid,etimes,comm` zu Beginn und am Ende, die Baum-Zahl in den Kommentar, kein `kill`. Der Grund ist, dass **`PPID 1` keine Waise beweist:** ein Run, der seinen Browser im Hintergrund startet und dessen Shell danach endet, bekommt ebenfalls `PPID 1` und fährt ihn über den Debug-Port unbeirrt weiter (am 2026-10-02 nachgemessen: ein so gestarteter `chrome-headless-shell` stand nach 4 s mit `PPID 1` in `ps` und ließ sich 18 s später über seine `ws://`-URL noch fehlerfrei fahren). Alter bliebe als einziger Unterscheider, und für einen langen Review-Lauf ist Alter kein Beweis — ein Reaper mit dieser Heuristik trifft in einem Workspace, den mehrere Runs gleichzeitig halten, irgendwann einen lebenden Lauf. Billig ist die Regel, weil `--remote-debugging-port=0` jedem Start einen freien Port gibt: Waisen blockieren niemanden, sie kosten Speicher, nicht Korrektheit. Der Sweep über fremde Bäume ist damit Host-Aufgabe, nicht Agent-Aufgabe.
 
@@ -401,8 +475,8 @@ deswegen nicht nach Regel 12 auf `blocked`.
 **Ein Head-Branch hat nie gleichzeitig einen offenen PR gegen `main` und einen gegen `stack/**`.**
 Entscheide dich für eine Base; brauchst du die andere, schließe den ersten PR, bevor du den zweiten
 öffnest. Der Grund: Check-Runs hängen bei `pull_request` am **Head-SHA**, und GitHub erlaubt zwei offene
-PRs von demselben Head, solange die Bases verschieden sind. Ab dem Merge von PR
-[#32](https://github.com/Padrio/padrio.github.io/pull/32) erzeugen dann **beide** PRs einen Check-Run unter
+PRs von demselben Head, solange die Bases verschieden sind. Seit dem Merge von PR
+[#32](https://github.com/Padrio/padrio.github.io/pull/32) erzeugen **beide** PRs einen Check-Run unter
 demselben Namen `pr-build` auf demselben Commit; die Concurrency-Group enthält `github.ref`
 (`refs/pull/N/merge`) und ist pro PR eindeutig, die Läufe räumen sich also nicht gegenseitig ab — die
 Reihenfolge ist ein Rennen. Ein grüner Lauf, der gegen den **Stack**-Base gebaut hat, kann so den
@@ -440,8 +514,22 @@ Stack-Historie umschreiben.
 2. jedes **offene** Kind mergt danach den neuen Stack-Tip ein; geschlossene Kinder werden nicht angefasst;
 3. niemals rebasen.
 
-Der Zweck des Nachziehens ist hier allein die Konfliktfreiheit beim späteren `--no-ff` — **nicht** ein
-Merge-Blocker. Das Ruleset `main: pr-build required` mit `strict_required_status_checks_policy: true` gilt
+**Derselbe Nachziehschritt gilt nach *jedem* Merge in den Stack, nicht nur bei `main`-Drift.** Mergt ein
+**Geschwisterkind** in den Stack-Branch, während `main` stillsteht, braucht jedes andere offene Kind
+genauso Schritt 2: den neuen Stack-Tip einmergen, nicht rebasen. Dieser Auslöser hängt nicht an `main`:
+jeder Merge eines Geschwisterkindes löst ihn für jedes übrige offene Kind aus.
+
+Der Grund gehört mitgeschrieben, sonst sieht der Schritt nach Buchhaltung aus: `pull_request` feuert
+`synchronize` nur, wenn sich der **Head** eines PR bewegt, nicht wenn seine **Base** weiterläuft (so
+beschreibt GitHub den Event — **das ist dokumentiert, nicht von uns gemessen**). Ein anderes offenes Kind
+behält damit sein grünes `pr-build`, das gegen den **alten** Stack-Tip gebaut hat; die Kombination, die beim
+Merge tatsächlich entsteht, hat nie gebaut. Erzwungen ist das Nachziehen hier nicht — siehe den nächsten
+Absatz und *Das Gate* unten (Board-Entscheidung vom 2026-10-03, Variante **C**,
+[PRI-165](/PRI/issues/PRI-165): nur Dokumentation, kein Ruleset auf `stack/**`).
+
+Das Nachziehen hat hier damit **zwei** Zwecke, und keiner von beiden ist ein Merge-Blocker: die
+Konfliktfreiheit beim späteren `--no-ff`, und dass das grüne `pr-build` die Kombination gebaut hat, die beim
+Merge wirklich entsteht. Das Ruleset `main: pr-build required` mit `strict_required_status_checks_policy: true` gilt
 für `~DEFAULT_BRANCH` (**Runtime-Realität**, „`main` ist per Ruleset geschützt"); ein Kind-PR mit Base
 `stack/**` wird also nie als `mergeable_state: "behind"` blockiert. Such an einem Kind-PR nicht nach einem
 Blocker, den es dort nicht gibt — das ist der Unterschied zu **Arbeitsablauf**, Schritt 5, der genau diesen
@@ -494,17 +582,43 @@ entscheidungsabhängig (braucht einen Fakt oder eine Abwägung von außen — Bo
 Der Deploy-Check wandert damit vom Kind zum Epic: ein Kind geht nie einzeln live, also kann es ihn auch
 nicht machen.
 
-**Das Gate.** `pr-build` triggert auch für Base `stack/**` — eingeführt mit
-[PRI-158](/PRI/issues/PRI-158), PR [#32](https://github.com/Padrio/padrio.github.io/pull/32). **Bis #32
-gemergt ist, greift der Trigger nicht:** `pr-build.yml` filtert dann weiter auf `branches: [ main ]`, und
-ein Kind-PR gegen `stack/**` erzeugt *gar keinen* Check — keinen roten, sondern keinen. Prüfe das am ersten
+**Das Gate.** `pr-build` triggert auch für Base `stack/**` — eingeführt mit [PRI-158](/PRI/issues/PRI-158),
+PR [#32](https://github.com/Padrio/padrio.github.io/pull/32), gemergt und seitdem aktiv: `pr-build.yml`
+listet unter `pull_request.branches` sowohl `main` als auch `'stack/**'`. **Fehlt dieser Eintrag, greift
+der Trigger nicht:** `pr-build.yml` filtert dann nur auf `branches: [ main ]`, und ein Kind-PR gegen
+`stack/**` erzeugt *gar keinen* Check — keinen roten, sondern keinen. Prüfe das am ersten
 Kind-PR eines neuen Stacks, bevor du dich auf das Gate verlässt. „Kein Check" liest man **über die API,
 nicht in der PR-Ansicht**: `pull-request-read` mit `method: get_check_runs`; vorhanden ist der Check, wenn
 `total_count ≥ 1` ist **und** ein Eintrag `name: "pr-build"` trägt. Ein fehlender Check sieht im UI nicht
 wie ein Fehler aus — genau diese Fehlerklasse ist hier gemeint. Läuft an einem Kind-PR gegen `stack/**`
-**kein** Check, wird nicht gemergt: dann fehlen beide automatischen Qualitätsgates des Projekts (Regel 3 —
-`npm run build` und das Grep-Gate gegen Tailwind-3-Idiome). Kommentar an Chief of Staff statt
-weiterarbeiten.
+**kein** Check, wird nicht gemergt: dann fehlen **alle drei** automatischen Qualitätsgates des Projekts
+(Regel 3 — das Grep-Gate gegen Tailwind-3-Idiome, `npm run build`, und das Bild-Gate, das *in* diesem
+Build feuert und mit ihm ausfällt). Kommentar an Chief of Staff statt weiterarbeiten.
+
+**Ein *rotes* `pr-build` hält genauso auf wie ein fehlendes.** Beides heißt, dass Regel 3 an diesem Kind
+nicht automatisch nachgewiesen ist; also wird auch dann nicht in den Stack gemergt. Der Unterschied liegt
+nur im Auffallen: rot siehst du in der PR-Ansicht, fehlend nicht — deshalb steht oben der API-Weg.
+
+**An einem Kind-PR gegen einen Stack-Branch erzwingt kein Check etwas.** Dort ist `pr-build`
+**nicht erforderlich**, sondern nur informativ: das Ruleset `main: pr-build required` ist auf `~DEFAULT_BRANCH`
+konditioniert — nicht auf das Literal `main` — und ein zweites Ruleset gibt es nicht; `stack/**` ist damit
+per Konstruktion von keinem erfasst, und man kann einen Stack-Branch auch nicht versehentlich in den
+Geltungsbereich hineinbenennen (gemessen am 2026-10-02, nur gelesen: genau **ein** Ruleset im Repository,
+`conditions.ref_name.include: ["~DEFAULT_BRANCH"]`, `bypass_actors: []` — Details in
+**Runtime-Realität**, „`main` ist per Ruleset geschützt"). Ein rotes oder fehlendes `pr-build` macht einen
+Kind-PR gegen einen Stack-Branch also nicht unmergebar — das ist aus dem Ruleset-Befund hergeleitet, am
+Kind-PR selbst haben wir es nicht gemessen. Was dort weiter blockt, sind etwa Merge-Konflikte; der Check
+tut es nicht. Die Disziplin des Implementers, der den roten oder fehlenden Haken sieht, ist dort das ganze
+Gate: an einem Kind-PR gegen einen Stack-Branch ist *Das Gate* eine Verhaltensregel, keine Mechanik.
+
+**Das ist keine zu schließende Lücke.** Board-Entscheidung vom 2026-10-03, Variante **C**
+([PRI-165](/PRI/issues/PRI-165)): nur Dokumentation, **kein** Ruleset auf `stack/**`. Der harte, erzwungene
+Schutz sitzt bewusst eine Ebene höher, dort, wo er den Live-Deploy abfängt — am Sammel-PR
+`stack/** → main`, an dem `pr-build` mit `strict_required_status_checks_policy: true` Pflicht und
+`bypass_actors` leer ist. Melde das fehlende Stack-Ruleset nicht erneut als Finding und lege es nicht an
+(Regel 14). Das Board hat die Ruleset-Variante nicht gewählt; eine Begründung nennt die Entscheidung
+nicht. Kosten, Nebenwirkungen und die zwei ungemessenen Einwände, die ein Umsetzungs-Issue für ein
+Ruleset auf `stack/**` zuerst klären müsste, stehen in [PRI-165](/PRI/issues/PRI-165).
 
 ---
 
@@ -534,7 +648,7 @@ Schritt einschiebt; im Zweifel gilt der Name, nicht die Nummer.
 3. Commit mit `--author="Pascal Krason <p.krason@icloud.com>"` und ohne `Co-Authored-By`-Trailer (Regel 2), Branch pushen.
 4. PR über `create-pull-request` öffnen, Link ins Issue.
 5. **Den Branch aktuell halten, solange der PR offen ist.** Das Ruleset `main: pr-build required` verlangt seit dem 2026-10-02 ein `pr-build`, das gegen den **aktuellen** `main` grün ist (`strict_required_status_checks_policy: true`, Regel 3). Merged in der Zwischenzeit ein anderer Autor seinen PR, wird deiner „out of date" (`mergeable_state: "behind"`) und ist nicht mergebar, bis du ihn nachziehst: `git fetch origin main`, rebasen (oder im UI „Update branch"), pushen, den neuen `pr-build`-Lauf abwarten. Ein Push ohne Rebase genügt nicht — GitHub prüft Ancestry, nicht die Bauzeit (Regel 3). Das ist deine Aufgabe als PR-Autor und kein Grund, auf `blocked` zu gehen. Prüfe es unmittelbar vor dem Merge in Schritt 8. Berührt dein PR dieselbe Datei wie ein anderer offener PR — `CLAUDE.md` ist der häufige Fall —, kostet dich ein `git merge-tree --write-tree <anderer-branch> <dein-branch>` vorab die Information, ob beim Nachziehen ein echter Textkonflikt auf dich wartet; prüfe es gegen **jeden** offenen PR auf derselben Datei, nicht nur gegen den, der dir gerade einfällt. Das ist die Koppelprüfung aus Regel 1, und sie ist vor dem Merge Pflicht, nicht Kür: eine gefundene Kopplung gehört als Kommentar in das Issue des anderen PR, **bevor** du mergst.
-   **Ziehst du nach einem abgeschlossenen Review nach, prüfe den nachgezogenen Stand selbst gegen die fremden Änderungen.** Ein Rebase ist kein Fix und löst Schritt 7 nach dessen Wortlaut nicht aus — zieht aber genau die fremden Änderungen in einen schon abgenommenen Stand, und ein konfliktfreies Rebase ist dabei der gefährlichere Ausgang, nicht der harmlose. Ein grüner `pr-build` deckt davon nur ab, was die beiden Gates sehen (Regel 3). Ändert das Nachziehen den Diff inhaltlich, gilt Schritt 7.
+   **Ziehst du nach einem abgeschlossenen Review nach, prüfe den nachgezogenen Stand selbst gegen die fremden Änderungen.** Ein Rebase ist kein Fix und löst Schritt 7 nach dessen Wortlaut nicht aus — zieht aber genau die fremden Änderungen in einen schon abgenommenen Stand, und ein konfliktfreies Rebase ist dabei der gefährlichere Ausgang, nicht der harmlose. Ein grüner `pr-build` deckt davon nur ab, was die drei Gates sehen (Regel 3). Ändert das Nachziehen den Diff inhaltlich, gilt Schritt 7.
 6. Review anfordern: für **jeden im Issue genannten Auditor** ein eigenes Review-Child-Issue anlegen und das eigene Issue per `blockedByIssueIds` an diese Child-Issues hängen. Das Review-Issue muss selbsterklärend sein — Ziel, Definition of Done, Branch und PR-Link, relevante Regeln, und was ausdrücklich nicht in Scope ist. Der Auditor kann das Elternissue möglicherweise nicht lesen. **Das Issue bleibt bei dir**; weise es keinem Auditor zu.
 7. Findings abarbeiten. Ändert ein Fix den Diff wesentlich, eine neue Review-Runde als neue Child-Issues aufsetzen — keine geschlossenen Reviews wiederbeleben.
    **Das Review-Issue einer Fix-Runde benennt die Belegpaare.** Jedes Paar von Zeilen, bei dem eine die andere belegt und mindestens eine im Delta liegt, gehört mit Zeilennummern hinein, und zwar in beide Richtungen: geänderter Beleg → abhängige Aussage, und geänderte Aussage → tragender Beleg. Wird kein Paar genannt, ist das die Behauptung, dass es keines gibt, und die ist selbst prüfbar. **Ist die Belegseite eines benannten Paares ein ausführbarer Block, führt der Auditor ihn aus** — Lesen genügt nicht, „freigestellt" ist dafür nicht zulässig, und kann er ihn nicht ausführen, ist das eine benannte Lücke im Verdikt. **Berührt das Delta einer Fix-Runde eine Zeile innerhalb eines dokumentierten Codeblocks oder ändert es eine Flag-, Viewport-, Warte- oder Binary-Angabe, ist das ein Auslöser für ein zusätzliches QA-Review**; nur Zahlen oder Belegsätze anzufassen genügt nicht. Entschieden wird es wie jedes Review von Chief of Staff (Abschnitt *Review-Matrix*) — der Auslöser nimmt die Entscheidung nicht vorweg und erlaubt keine Selbstbeauftragung. Herkunft: eine Fix-Runde schob `--hide-scrollbars` in den Codeblock und ließ den Belegsatz daneben auf dem alten Messaufbau stehen; gefunden hat es der Code Auditor, weil er den Block ausgeführt hat, obwohl sein Review-Issue das freistellte ([PRI-152](/PRI/issues/PRI-152)).

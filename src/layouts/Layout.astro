@@ -4,15 +4,51 @@ import Footer from '../components/Footer.astro';
 import ConsentBanner from '../components/ConsentBanner.astro';
 import '../styles/global.css';
 
-// Self-hosted fonts (no external requests to Google)
-import '@fontsource/inter/400.css';
-import '@fontsource/inter/500.css';
-import '@fontsource/inter/600.css';
-import '@fontsource/inter/700.css';
-import '@fontsource/inter/800.css';
-import '@fontsource/jetbrains-mono/400.css';
-import '@fontsource/jetbrains-mono/500.css';
-import '@fontsource/jetbrains-mono/600.css';
+// Self-hosted fonts (no external requests to Google).
+//
+// Latin subsets only. The default entrypoints (`inter/400.css`) pull every subset of
+// a weight into the render-blocking CSS: for the seven imports below, 47 @font-face
+// rules, among them Cyrillic, Greek and Vietnamese, which this page (lang="en") needs
+// no character from. Four JetBrains Mono faces on top of that — cyrillic-ext and
+// vietnamese in both imported weights, six files, because cyrillic-ext is below the
+// limit in woff2 *and* woff — fall under Vite's assetsInlineLimit of 4096 B and
+// therefore end up as base64 data URIs *inside* the CSS. No Inter file is below that
+// limit.
+//
+// The gain is the CSS size alone, not the number of font downloads: unicode-range
+// correctly keeps an unused subset from being fetched — both variants fetch the very
+// same woff2 files per page, four to seven of them depending on the page — but it cannot
+// remove the bytes of a data URI from the stylesheet. Those travel unconditionally, even
+// when the browser never uses the rule.
+//
+// The latin-* entrypoints deliberately carry *no* unicode-range (that is how Fontsource
+// ships them). `latin` can therefore not be imported next to `latin-ext`: without a
+// range the second declaration would mask the first for every character. It is one or
+// the other. Consequence for content: a Latin Extended-A character then renders through
+// per-character fallback from a system font instead of Inter — visibly different, but
+// not broken. The built HTML contains no such character today; the only character
+// outside latin is the arrow U+2192, which no subset range Fontsource ships for either
+// family covers, so it already fell back before the latin-only change.
+//
+// This site now ships JetBrains Mono at 400 and 600 — the only two mono weights any
+// page renders. Weight 500 was imported here and used by nothing, so it is gone. What
+// brings it back is a `font-mono` element at weight 500, either from `font-medium` on
+// the element or inherited from an ancestor; until the import returns, such an element
+// renders the 400 face — matching prefers 400 over 600 for a requested 500 and applies
+// no synthetic emboldening, so the weight is lost silently rather than approximated.
+// `document.fonts.check('500 16px "JetBrains Mono"')` answers "is a *matching* face
+// available" and therefore reports true even with no 500 face declared: check the
+// resolved platform font, not check(). A <kbd> does not bring the weight back either:
+// inside `.prose` the typography plugin pairs `font-weight: 500` with
+// `font-family: inherit`, so it renders Inter 500, and outside `.prose` a `kbd` takes
+// the mono family at 400. Both <kbd> cases measured.
+import '@fontsource/inter/latin-400.css';
+import '@fontsource/inter/latin-500.css';
+import '@fontsource/inter/latin-600.css';
+import '@fontsource/inter/latin-700.css';
+import '@fontsource/inter/latin-800.css';
+import '@fontsource/jetbrains-mono/latin-400.css';
+import '@fontsource/jetbrains-mono/latin-600.css';
 
 interface Props {
   title: string;
@@ -24,16 +60,23 @@ interface Props {
 // Default OG image: dedicated 1200x630 share card — the ratio the platforms crop to.
 // PNG rather than WebP because WebP preview support differs across platforms.
 // Override per page with the image prop.
+const DEFAULT_OG_IMAGE = '/images/og-image.png';
 const {
   title,
   description = 'Solutions Architect & backend engineer — architecture, test harnesses and AI agent teams for systems that have to be provably correct.',
-  image = '/images/og-image.png',
+  image,
   lang = 'en',
 } = Astro.props;
 const ogLocales: Record<string, string> = { en: 'en_US', de: 'de_DE' };
 // Look up on the normalized base subtag so regional tags (de-DE, DE) map to their locale
 const ogLocale = ogLocales[lang.split('-')[0].toLowerCase()] ?? ogLocales.en;
-const canonicalURL = new URL(Astro.url.pathname, Astro.site || 'https://pkrason.de');
+const siteURL = Astro.site || 'https://pkrason.de';
+const canonicalURL = new URL(Astro.url.pathname, siteURL);
+// og:image and twitter:image must be absolute: the crawlers that read them have no
+// document base to resolve a root-relative path against. Same pattern as canonicalURL.
+// An already absolute image prop passes through new URL() unchanged; a blank one falls
+// back to the default, because new URL('', siteURL) would ship the site root as the card.
+const imageURL = new URL(image?.trim() || DEFAULT_OG_IMAGE, siteURL);
 
 // JSON-LD Schema
 const jsonLd = {
@@ -71,7 +114,7 @@ const jsonLd = {
     <meta property="og:url" content={canonicalURL} />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
-    <meta property="og:image" content={image} />
+    <meta property="og:image" content={imageURL} />
     <meta property="og:locale" content={ogLocale} />
 
     <!-- Twitter -->
@@ -79,7 +122,7 @@ const jsonLd = {
     <meta name="twitter:url" content={canonicalURL} />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
-    <meta name="twitter:image" content={image} />
+    <meta name="twitter:image" content={imageURL} />
 
     <!-- JSON-LD Schema -->
     <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />

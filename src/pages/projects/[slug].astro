@@ -43,23 +43,56 @@ const readingTime = Math.max(1, Math.ceil(words / 200));
 // Filter headings for TOC (h2 and h3 only)
 const tocHeadings = headings.filter(h => h.depth === 2 || h.depth === 3);
 
+// One fallback host for the whole file, so no two fields in the same JSON-LD object can
+// disagree about where the site lives. Same expression Layout.astro resolves canonical,
+// og:url and og:image against.
+const siteURL = Astro.site || 'https://pkrason.de';
+
+// Trimmed once so the guard below and the value it emits cannot disagree: a whitespace-only
+// image: is schema-valid and truthy, but new URL() strips the whitespace and would resolve
+// it to the site root.
+const ogImage = project.data.image?.trim();
+
 // SoftwareApplication structured data for richer SEO surface
 const projectJsonLd = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   "name": project.data.title,
   "description": project.data.description,
-  ...(project.data.image && { "image": `https://pkrason.de${project.data.image}` }),
-  "url": `https://pkrason.de/projects/${project.id}`,
+  // Resolved the same way as og:image in Layout.astro, so for any non-blank image both
+  // carry the byte-identical URL (rule 9). String interpolation would not: new URL()
+  // percent-encodes the path. Guard and value both read the trimmed value, so a blank
+  // one drops the key here instead of resolving to the site root; Layout falls back to
+  // the default card in that case, and an omitted field has nothing to diverge from.
+  ...(ogImage && {
+    "image": new URL(ogImage, siteURL).href,
+  }),
+  // Built from the same two inputs as canonical and og:url in Layout.astro
+  // (Astro.url.pathname and Astro.site), so this follows the route instead of
+  // reconstructing it from project.id and can no longer disagree with the route (rule 9).
+  // Those remain two copies of one expression, not one source: an edit to either file can
+  // separate them again. It also has to carry the trailing slash: build.format defaults
+  // to 'directory', so the page is served at /projects/<id>/ and the slashless form that
+  // string interpolation produced answered 301 — every SoftwareApplication.url pointed at
+  // a redirect while canonical, og:url and the sitemap all used the slash.
+  "url": new URL(Astro.url.pathname, siteURL).href,
   "datePublished": project.data.date,
   "author": {
     "@type": "Person",
     "name": "Pascal Krason",
+    // Left as the literal the Person block in Layout.astro emits. siteURL is a URL
+    // object whose href carries a trailing slash, so deriving it here would make this
+    // field disagree with that block on the same page.
     "url": "https://pkrason.de"
   },
   "applicationCategory": "BusinessApplication",
-  ...(project.data.tags && { "keywords": project.data.tags.join(", ") }),
-  ...(project.data.demo && { "sameAs": [project.data.demo] })
+  ...(project.data.tags && { "keywords": project.data.tags.join(", ") })
+  // demo: is deliberately not emitted. It was mapped to sameAs, which was wrong: both
+  // Konteo projects carry the same https://konteo.de, so sameAs asserted that two
+  // distinct SoftwareApplication entities were the same thing. No other field fits
+  // either — the value is a product landing page (the UI labels it "Live Demo" below),
+  // not an installUrl or downloadUrl, and url is the detail page. Emitting any of them
+  // would replace a false claim with a weaker one, so the field stays out (rule 13).
 };
 ---
 
@@ -76,7 +109,7 @@ const projectJsonLd = {
       <div data-reveal>
         <a
           href="/projects/"
-          class="inline-flex items-center gap-[7px] text-[14.5px] font-medium text-stone-500 hover:text-orange-600 transition-colors mb-7 py-2 min-h-[44px]"
+          class="inline-flex items-center gap-[7px] text-[14.5px] font-medium text-stone-500 hover:text-orange-700 transition-colors mb-7 py-2 min-h-[44px]"
         >
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M15 18l-6-6 6-6"/>
@@ -178,7 +211,7 @@ const projectJsonLd = {
                     href={project.data.github}
                     target="_blank"
                     rel="noopener noreferrer"
-                    class="inline-flex items-center gap-[7px] text-sm font-medium text-orange-600 hover:text-orange-700 transition-colors min-h-[44px]"
+                    class="inline-flex items-center gap-[7px] text-sm font-medium text-orange-700 hover:text-orange-800 transition-colors min-h-[44px]"
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                       <path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.3.8-.6v-2c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.7 18.3 5 18.3 5c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5z"/>
@@ -191,7 +224,7 @@ const projectJsonLd = {
                     href={project.data.demo}
                     target="_blank"
                     rel="noopener noreferrer"
-                    class="inline-flex items-center gap-[7px] text-sm font-medium text-orange-600 hover:text-orange-700 transition-colors min-h-[44px]"
+                    class="inline-flex items-center gap-[7px] text-sm font-medium text-orange-700 hover:text-orange-800 transition-colors min-h-[44px]"
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                       <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/>
@@ -212,7 +245,7 @@ const projectJsonLd = {
                   <a
                     href={`#${heading.slug}`}
                     data-toc-link={heading.slug}
-                    class={`-ml-0.5 border-l-2 border-transparent transition-colors hover:text-orange-600 ${
+                    class={`-ml-0.5 border-l-2 border-transparent transition-colors hover:text-orange-700 ${
                       heading.depth === 3
                         ? 'text-[13px] text-stone-500 py-1 pl-[26px]'
                         : 'text-[13.5px] text-stone-600 py-[5px] pl-3.5'
@@ -296,7 +329,18 @@ const projectJsonLd = {
       if (section.getBoundingClientRect().top - 110 <= 0) current = section.id;
     }
     tocLinks.forEach((link) => {
-      link.classList.toggle('toc-active', link.dataset.tocLink === current);
+      const isCurrent = link.dataset.tocLink === current;
+      link.classList.toggle('toc-active', isCurrent);
+      // Expose the same state to assistive tech; "location" is the aria-current
+      // token for the current position within a set of sections. Write only on a
+      // real change: unlike classList.toggle, setAttribute is never a no-op.
+      if (isCurrent) {
+        if (link.getAttribute('aria-current') !== 'location') {
+          link.setAttribute('aria-current', 'location');
+        }
+      } else {
+        link.removeAttribute('aria-current');
+      }
     });
   }
 
@@ -341,7 +385,7 @@ const projectJsonLd = {
   }
 
   .prose-project a {
-    color: var(--color-orange-600);
+    color: var(--color-orange-700);
     text-decoration: none;
     /* orange-200 has no utility usage anywhere in src/; this var() reference is
        the only thing that makes Tailwind emit --color-orange-200. Without the
@@ -354,7 +398,7 @@ const projectJsonLd = {
   }
 
   .prose-project a:hover {
-    border-color: var(--color-orange-600);
+    border-color: var(--color-orange-700);
   }
 
   .prose-project strong {
@@ -495,8 +539,8 @@ const projectJsonLd = {
 
   /* Active TOC entry (toggled by the scroll-spy script) */
   .toc-active {
-    color: var(--color-orange-600) !important;
-    border-left-color: var(--color-orange-600) !important;
+    color: var(--color-orange-700) !important;
+    border-left-color: var(--color-orange-700) !important;
     font-weight: 600;
   }
 </style>
