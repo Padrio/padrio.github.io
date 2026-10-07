@@ -181,7 +181,27 @@ Die Detailseite wird für **jedes** Projekt erzeugt, unabhängig von `featured`.
 7. **Rechtliches:** `src/pages/legal.astro` und `src/pages/privacy.astro` nur mit ausdrücklicher Board-Freigabe ändern. Neue Third-Party-Skripte, Tracker, externe CDN-Fonts oder Embeds brauchen eine Board-Freigabe **und** eine passende Anpassung der Datenschutzerklärung (DSGVO).
 8. **Keine neuen Dependencies und keine Major-Upgrades** ohne Board-Freigabe.
 9. **Cross-Pfad-Konsistenz:** wo dieselben Daten an mehreren Stellen gerendert werden (ProjectCard auf der Startseite vs. Detailseite, Frontmatter vs. JSON-LD vs. OG-Tags), alle Pfade Feld für Feld vergleichen. Jede Abweichung muss begründet sein.
-10. **Bestehende URLs und Redirects nicht brechen** — insbesondere die beiden Redirects in `astro.config.mjs`: `/projects/vendbridge-panel` → `/projects/konteo-panel` und `/projects/vendprovision` → `/projects/konteo-provision`. Beide sind dort als `status: 301` deklariert, im statischen Build erzeugt Astro daraus aber eine **Meta-Refresh-Seite** (`<meta http-equiv="refresh" content="0;url=…">` plus `<link rel="canonical">` und `robots: noindex`) — GitHub Pages liefert nur statische Dateien aus und kann für eine eigene Redirect-Regel deshalb keinen HTTP-301 setzen; der einzige echte 301 dort ist die automatische Trailing-Slash-Normalisierung. Ein `200` auf der alten URL **mit** Trailing Slash ist deshalb korrekt und kein Defekt: geprüft wird der Seiteninhalt (`curl -sL https://pkrason.de/projects/vendbridge-panel/ | grep http-equiv`), nicht der Statuscode — `curl -I` beantwortet hier nicht die Frage, die man stellt.
+10. **Bestehende URLs und Redirects nicht brechen** — geschützt ist **jeder Eintrag, den `astro.config.mjs` unter `redirects` deklariert**, und nicht eine in dieser Regel festgeschriebene Auswahl. Heute sind das vier:
+    - `/projects/vendbridge-panel` → `/projects/konteo-panel`
+    - `/projects/vendprovision` → `/projects/konteo-provision`
+    - `/projects/toolstone-identity-tracker` → `/`
+    - `/projects/toolstone-privacy-manager` → `/`
+
+    **Die Aufzählung ist Beispiel, nicht Grenze** — dasselbe Muster wie die Generalklausel in Regel 14. Kommt ein Redirect hinzu oder ändert sich ein Ziel, steht er mit dem Commit unter dieser Regel, auch wenn die Liste hier noch den alten Stand nennt; maßgeblich ist die Konfiguration, nicht diese vier Zeilen. Die Ist-Zahl kostet einen Griff: `grep -c 'status: 301' astro.config.mjs` (am 2026-10-07: `4`), die Paare stehen im `redirects`-Block darunter.
+    *Warum die Verallgemeinerung: die frühere Fassung nannte „die beiden Redirects" und meinte damit die zwei Konteo-Umzüge. Die beiden Toolstone-Einträge kamen später mit `f41ef40` dazu, haben denselben Zweck und fielen trotzdem wörtlich nicht unter die Regel — ein Agent hätte sie formal regelkonform entfernen können. Eine Lücke, keine Absicht; geschlossen mit [PRI-168](/PRI/issues/PRI-168).*
+
+    Alle vier sind dort als `status: 301` deklariert, im statischen Build erzeugt Astro daraus aber eine **Meta-Refresh-Seite** (`<meta http-equiv="refresh" content="0;url=…">` plus `<link rel="canonical">` und `robots: noindex`) — GitHub Pages liefert nur statische Dateien aus und kann für eine eigene Redirect-Regel deshalb keinen HTTP-301 setzen; der einzige echte 301 dort ist die automatische Trailing-Slash-Normalisierung. Ein `200` auf der alten URL **mit** Trailing Slash ist deshalb korrekt und kein Defekt: geprüft wird der Seiteninhalt (Prüfanleitung gleich unten), nicht der Statuscode — `curl -I` beantwortet hier nicht die Frage, die man stellt.
+
+    **Prüfanleitung, alle Einträge auf einmal.** Der Trailing Slash ist Pflicht: ohne ihn antwortet GitHub Pages mit dem echten 301 der Trailing-Slash-Normalisierung, und mit `-L` landest du auf der Zielseite, die kein `http-equiv` trägt — die Probe liefe dann ins Leere und sähe aus wie ein fehlender Redirect.
+
+    ```bash
+    for u in vendbridge-panel vendprovision toolstone-identity-tracker toolstone-privacy-manager; do
+      printf '%-34s ' "$u"
+      curl -s "https://pkrason.de/projects/$u/" | grep -o 'http-equiv="refresh" content="[^"]*"'
+    done
+    ```
+
+    Jede Zeile muss das Ziel aus der Liste oben nennen — bei den **beiden Toolstone-URLs also `content="0;url=/"`, die Startseite und keine Projektseite**. Eine Zeile ohne Treffer heißt, dass der Redirect fehlt. Am 2026-10-07 trafen alle vier. Die URL-Liste in der Schleife ist wie die Aufzählung oben ein Ist-Stand: sie wird aus dem `redirects`-Block von `astro.config.mjs` nachgeführt, nicht umgekehrt.
 11. **Keine Secrets ins Repo** (`.env` ist gitignored).
 12. **Bei Unklarheit nicht raten:** Frage als Kommentar in das zugehörige Issue, Status `blocked`, Chief of Staff @-erwähnen. Das gilt auch für einen **fehlenden Fakt** nach Regel 13: `blocked`, nicht `in_review`. Mit einer Frage-Karte gehst du nicht selbst ans Board — die Frage wird ein eigenes Frage-Issue für Chief of Staff, an dem dein Issue hängt. Wie das geht und warum es anders nicht geht, steht in **Arbeitsablauf**, Schritt 10.
 13. **Keine Fakten erfinden** — keine Projektdetails, Kunden, Zahlen, Zeiträume oder Rollen. Fehlende Fakten erfragen — den Weg dafür beschreibt **Arbeitsablauf**, Schritt 10.
