@@ -68,9 +68,11 @@ Hier kommt der Inhalt des Projekts...
 
 ## Bilder in WebP umwandeln (macOS)
 
-Projektbilder werden ausschließlich im WebP-Format unter `public/images/projects/` gespeichert (keine PNG-/JPG-Duplikate committen), da es deutlich kleinere Dateigrößen bei vergleichbarer Qualität bietet.
+Bilder werden ausschließlich im WebP-Format unter `public/images/` gespeichert (keine PNG-/JPG-Duplikate committen), da es deutlich kleinere Dateigrößen bei vergleichbarer Qualität bietet. Einzige Ausnahme ist das OG-/Social-Vorschaubild `public/images/og-image.png`; Geltungsbereich und Begründung stehen in Regel 6 in [`CLAUDE.md`](CLAUDE.md).
 
 ### cwebp installieren
+
+Verbindlich ist das Qualitätsziel (rund q80), nicht das Werkzeug: Im Agent-Workspace ist `cwebp` nicht installiert, dort lässt sich `sharp` aus `node_modules` verwenden. Details in Regel 6 in [`CLAUDE.md`](CLAUDE.md).
 
 ```bash
 brew install webp
@@ -82,7 +84,7 @@ brew install webp
 cwebp -q 80 input.png -o output.webp
 ```
 
-`-q 80` setzt die Qualität auf 80% (empfohlen für Projektbilder).
+`-q 80` setzt die Qualität auf 80% (empfohlen für Bilder unter `public/images/`).
 
 ### Alle PNGs in einem Ordner umwandeln
 
