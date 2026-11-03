@@ -97,7 +97,11 @@ plugins/assert-content-images.mjs  Das dritte automatische Gate (Abschnitt Befeh
                               nicht im Plugin: ein throw im Markdown-Render endet mit Exit 0,
                               einer in astro:build:done mit 1 (Regel 3)
 public/CNAME                  Custom Domain pkrason.de
-public/favicon.svg
+public/favicon.svg            Favicon, adaptiv hell/dunkel per prefers-color-scheme; dazu favicon.ico
+                              (16/32/48), apple-touch-icon.png, icon-192/512.png und
+                              site.webmanifest — alle eingebunden im <head> von Layout.astro
+public/logo-mark.svg          Logo-Marke „Kompakt“ (PK in vier Schnittmarken, Schrift als Pfade).
+                              Generiert, nicht von Hand ändern: Quelle ist brand/logo/build.cjs
 public/robots.txt             User-agent: * / Allow: / plus Sitemap-Verweis auf
                               https://pkrason.de/sitemap-index.xml (den @astrojs/sitemap erzeugt)
 public/images/**              Bilder ausschließlich als WebP (Regel 6), mit genau einer Ausnahme —
@@ -106,6 +110,12 @@ public/images/profile.webp    Profilfoto im Hero, 264x264 (2x für die 132-px-Da
 public/images/og-image.png    Default-OG-Bild, 1200x630 — die Ausnahme von Regel 6 (PNG, weil
                               Social-Plattformen WebP-Vorschauen unterschiedlich unterstützen)
 public/images/projects/*.webp Projekt-Screenshots
+
+brand/logo/                   Logo-Paket außerhalb des Builds: SVG/PNG-Varianten, Favicon-Set,
+                              druck/ (Briefkopf, Rechnung, Graustufen, Mail-Signatur), README mit
+                              Farben und Regeln. build.cjs erzeugt alles neu und kopiert die Marke
+                              nach public/logo-mark.svg; opentype.js nur temporär per NODE_PATH, keine
+                              Dependency (Regel 8) — Aufruf steht im Kopf von build.cjs
 
 src/content.config.ts         Schema der Content Collection "projects" (Zod, Content Layer API)
 src/content/projects/*.md     Ein Markdown-File pro Projekt, Frontmatter nach obigem Schema
@@ -122,7 +132,8 @@ src/pages/projects/[slug].astro  Projekt-Detailseite: getStaticPaths über die C
 src/pages/legal.astro         Impressum
 src/pages/privacy.astro       Datenschutzerklärung
 src/components/               Hero, CareerTimeline, ExperienceCard, ProjectCard, Navigation, Footer,
-                              ConsentBanner
+                              ConsentBanner, LogoMark (rendert /logo-mark.svg als <img>, damit keine
+                              SVG-Pfade im Komponentencode stehen — Regel 5; genutzt in Nav und Footer)
 src/scripts/consent.js        Consent-Gate für Clarity: Projekt-ID, Clarity.init und der dynamische
                               Import, der vor dem Opt-in nicht ausgeführt wird. Importiert von
                               ConsentBanner und von src/pages/privacy.astro (dort hängen der
