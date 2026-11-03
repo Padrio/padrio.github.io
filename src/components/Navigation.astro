@@ -14,19 +14,21 @@ const anchor = (hash: string) => (isHome ? hash : `/${hash}`);
       288px (a 320px viewport minus px-4); the `sm:` values are the design size
       and are unchanged. Heights are deliberately untouched — min-h and py stay.
 
-      It fits, but only just: at 320px the row occupies 284.45px of those 288px
-      (logo 93.45 + link group 191), so there are 3.55px to spare. A fourth nav
-      link, a longer label or a wider font will overflow 320px again — that is a
-      layout change, not a tweak. A webfont failure is the safe direction:
-      without Inter the row measures 255.39px, so Inter is the widest case and
-      therefore the one these numbers were measured against. */}
+      Brand block = logo mark + name. Below 380px the name is visually hidden
+      (sr-only, still read out) and only the 28px mark stays, because mark + name
+      (128.78px) + link group (188.44px) need 317.22px, i.e. a viewport of at
+      least 349px. Measured 2026-11-03 via CDP, clientWidth == scrollWidth at
+      320/379/380/390/700/768/1280; spare space: 71.56px at 320 (mark only),
+      30.78px at 380 (mark + name). A fourth nav link, a longer label or a wider
+      font eats into that — re-measure, and move the 380px threshold with it.
+      A webfont failure is the safe direction: without Inter the text is narrower. */}
   <div class="max-w-content mx-auto px-4 sm:px-7 py-2 sm:py-2.5 flex items-center justify-between">
     <a
       href="/"
       class="group text-[14px] sm:text-[17px] font-bold tracking-tight text-stone-900 whitespace-nowrap py-2 min-h-[44px] flex items-center gap-2 sm:gap-2.5"
     >
       <LogoMark size={30} class="w-[28px] h-[28px] sm:w-[30px] sm:h-[30px] shrink-0 transition-transform duration-300 motion-safe:group-hover:scale-[1.06]" />
-      <span class="max-[379px]:sr-only">Pascal Krason</span>
+      <span class="max-[380px]:sr-only">Pascal Krason</span>
     </a>
     <div class="flex items-center sm:gap-1">
       <a
